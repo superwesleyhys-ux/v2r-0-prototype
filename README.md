@@ -24,8 +24,26 @@ See `NORTH_STAR.md` for the final product goal and safety boundary.
 - Order state machine
 - QC checklist
 - Delivery package and feedback learning
+- Optional OpenAI API proxy for AI-structured Ticket drafts
 
 Open `index.html` directly in a browser, or publish the repository through GitHub Pages. The demo stores state in `localStorage`, and the JSON export button downloads the current Ticket object.
+
+## OpenAI API Binding
+
+Real API keys must stay on the server. This repo does not store a real key in front-end code, GitHub Pages, README, or committed files.
+
+For local API-backed testing:
+
+1. Copy `.env.example` to `.env.local`.
+2. Put the real key in `OPENAI_API_KEY` inside `.env.local`.
+3. Keep `OPENAI_MODEL=gpt-5.4-mini` or replace it with another available Responses API model.
+4. Keep `OPENAI_BASE_URL=https://api.openai.com/v1` unless you deploy behind your own compatible API gateway.
+5. Run `node server.mjs`.
+6. Open `http://localhost:8766/`.
+
+The front end calls `/api/structure-intent`. `server.mjs` forwards that request to the OpenAI Responses API with `Authorization: Bearer $OPENAI_API_KEY`, then returns only the structured draft to the browser.
+
+GitHub Pages remains a static public demo. The API-backed button only works when this project is served by `server.mjs` or a deployed backend with `OPENAI_API_KEY` configured.
 
 ## Demo Flow
 

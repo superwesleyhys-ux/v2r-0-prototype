@@ -156,6 +156,7 @@ const defaultState = () => ({
   delivery_method: "ship_to_home",
   learning: [],
   quote_inputs: null,
+  ai_draft: null,
   history: [],
   last_action_message: "等待用户输入。",
 });
@@ -197,6 +198,7 @@ function bindEvents() {
   });
 
   $("#run-gate").addEventListener("click", () => runPipeline());
+  $("#run-ai-draft").addEventListener("click", requestAiDraft);
   $("#load-headset").addEventListener("click", () => {
     $("#idea-input").value = "我想要一个夹在桌边的耳机架，还能绕数据线，黑色，不要打孔。";
     runPipeline({
@@ -220,6 +222,63 @@ function bindEvents() {
   $("#save-feedback").addEventListener("click", saveFeedback);
   $("#export-json").addEventListener("click", exportJson);
   $("#reset-demo").addEventListener("click", resetDemo);
+}
+
+async function requestAiDraft() {
+  const intent = $("#idea-input").value.trim();
+  if (!intent) {
+    setAiStatus("先写一个想法，再请求 AI 结构化。", "warning");
+    return;
+  }
+
+  const button = $("#run-ai-draft");
+  button.disabled = true;
+  setAiStatus("AI 正在结构化 Reality Ticket 草案...", "loading");
+
+  try {
+    const response = await fetch("/api/structure-intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intent }),
+    });
+    const data = await parseJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data.error || `API 请求失败：${response.status}`);
+    }
+
+    runPipeline();
+    state.ai_draft = data.draft || { output_text: data.output_text || "" };
+    state.last_action_message = "AI 结构化草案已保存；Reality Gate 仍由本地安全规则复核。";
+    addHistory("AI_DRAFT_CREATED", "openai_proxy", `模型 ${data.model || "unknown"} 返回结构化草案。`);
+    saveState();
+    render();
+    setTab("ticket");
+    setAiStatus("AI 草案已写入 Ticket JSON，本地 Reality Gate 已复核。", "ok");
+  } catch (error) {
+    const message = error.message === "Failed to fetch" ? "未检测到本地 API 代理，请通过后端服务打开页面。" : error.message;
+    setAiStatus(message.includes("OPENAI_API_KEY") ? "服务端还没有配置 OPENAI_API_KEY。" : message, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function parseJsonResponse(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      error: response.ok ? "API 返回内容不是 JSON。" : "API 代理未启用或返回了非 JSON 响应。",
+    };
+  }
+}
+
+function setAiStatus(message, tone = "neutral") {
+  const status = $("#ai-status");
+  if (!status) return;
+  status.textContent = message;
+  status.className = `ai-status ${safeClassToken(tone)}`.trim();
 }
 
 function setTab(name) {
