@@ -685,6 +685,17 @@ td {
   color: var(--teal);
 }
 
+.state-note {
+  margin-top: 12px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 13px;
+}
+
 .qc-item {
   grid-template-columns: 24px 1fr;
   align-items: center;

@@ -1,0 +1,9 @@
+{
+  "template_id": "drawer_divider_v1",
+  "name": "抽屉分隔件",
+  "risk_class": "A",
+  "required_measurements": ["drawer_size", "compartments", "priority"],
+  "print_parts": ["divider_walls", "connector_tabs"],
+  "buy_parts": [],
+  "qc": ["dimension_check", "fit_check", "edge_check", "photo_record"]
+}

@@ -1,0 +1,9 @@
+{
+  "template_id": "cable_clip_v1",
+  "name": "线缆管理器",
+  "risk_class": "A",
+  "required_measurements": ["cable_count", "mount_surface", "priority"],
+  "print_parts": ["clip_body", "cable_channels"],
+  "buy_parts": ["adhesive_pad"],
+  "qc": ["fit_check", "adhesion_check", "kit_check", "photo_record"]
+}

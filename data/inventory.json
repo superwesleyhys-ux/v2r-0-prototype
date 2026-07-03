@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "sku": "m4-screw-35",
+      "name": "M4 螺丝",
+      "quantity_available": 40,
+      "unit_cost": 0.18,
+      "risk_level": "low"
+    },
+    {
+      "sku": "m4-nut-standard",
+      "name": "M4 螺母",
+      "quantity_available": 60,
+      "unit_cost": 0.08,
+      "risk_level": "low"
+    },
+    {
+      "sku": "rubber-pad-20x30",
+      "name": "防滑橡胶垫",
+      "quantity_available": 24,
+      "unit_cost": 0.42,
+      "risk_level": "low"
+    },
+    {
+      "sku": "small-corrugated-box",
+      "name": "小号瓦楞盒",
+      "quantity_available": 18,
+      "unit_cost": 0.85,
+      "risk_level": "low"
+    }
+  ]
+}

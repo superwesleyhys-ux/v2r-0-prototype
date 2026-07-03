@@ -20,6 +20,57 @@ const statuses = [
   "REFUNDED",
 ];
 
+const fallbackVendors = [
+  {
+    vendor_id: "standard_parts_bin",
+    name: "认证标准件箱",
+    capabilities: ["m4_screws", "rubber_pads", "packaging"],
+    trust_score: 95,
+    qc_supported: true,
+    photo_record_supported: true,
+    average_turnaround_days: 1,
+    failure_rate: 0.02,
+    note: "螺丝、螺母、防滑垫、包装盒有库存记录。",
+  },
+  {
+    vendor_id: "local_print_a",
+    name: "本地打印点 A",
+    capabilities: ["PLA", "PETG", "small_parts"],
+    trust_score: 88,
+    qc_supported: true,
+    photo_record_supported: true,
+    average_turnaround_days: 3,
+    failure_rate: 0.07,
+    note: "PETG/PLA 小件稳定，支持拍照质检。",
+  },
+  {
+    vendor_id: "approved_marketplace_vendor",
+    name: "审核过的平台商户",
+    capabilities: ["finished_goods", "tracked_shipping", "returns"],
+    trust_score: 82,
+    qc_supported: false,
+    photo_record_supported: false,
+    average_turnaround_days: 4,
+    failure_rate: 0.05,
+    note: "可追踪物流，支持退换货，价格无异常低值。",
+  },
+];
+
+let vendorCatalog = fallbackVendors;
+
+const quoteProfiles = {
+  桌边夹式耳机架: {
+    buy: { productCost: 12, shippingCost: 5.5, packagingCost: 1, taxRate: 0.06, platformFeeRate: 0.12, reworkRiskRate: 0.02, delivery: "2-4 天", trust: 82 },
+    print: { materialGrams: 72, materialCostPerGram: 0.035, printHours: 2.8, machineHourlyRate: 2.5, laborMinutes: 16, laborHourlyRate: 15, standardPartsCost: 0, packagingCost: 2.2, shippingCost: 5.5, taxRate: 0.05, platformFeeRate: 0.12, reworkRiskRate: 0.11, delivery: "3-6 天", trust: 76 },
+    hybrid: { materialGrams: 65, materialCostPerGram: 0.035, printHours: 2.4, machineHourlyRate: 2.5, laborMinutes: 12, laborHourlyRate: 15, standardPartsCost: 4.8, packagingCost: 2.1, shippingCost: 5.5, taxRate: 0.06, platformFeeRate: 0.12, reworkRiskRate: 0.08, delivery: "3-5 天", trust: 91 },
+  },
+  default: {
+    buy: { productCost: 10.5, shippingCost: 5.5, packagingCost: 1, taxRate: 0.06, platformFeeRate: 0.12, reworkRiskRate: 0.02, delivery: "2-5 天", trust: 80 },
+    print: { materialGrams: 55, materialCostPerGram: 0.035, printHours: 2, machineHourlyRate: 2.5, laborMinutes: 10, laborHourlyRate: 15, standardPartsCost: 0, packagingCost: 2, shippingCost: 5.5, taxRate: 0.05, platformFeeRate: 0.12, reworkRiskRate: 0.1, delivery: "3-6 天", trust: 74 },
+    hybrid: { materialGrams: 48, materialCostPerGram: 0.035, printHours: 1.8, machineHourlyRate: 2.5, laborMinutes: 10, laborHourlyRate: 15, standardPartsCost: 3.8, packagingCost: 2, shippingCost: 5.5, taxRate: 0.06, platformFeeRate: 0.12, reworkRiskRate: 0.07, delivery: "3-5 天", trust: 88 },
+  },
+};
+
 const riskRules = [
   {
     risk: "D",
@@ -104,6 +155,9 @@ const defaultState = () => ({
   package_items: [],
   delivery_method: "ship_to_home",
   learning: [],
+  quote_inputs: null,
+  history: [],
+  last_action_message: "等待用户输入。",
 });
 
 let state = loadState();
@@ -111,12 +165,24 @@ let state = loadState();
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadCatalogs();
   bindEvents();
   hydrateInputs();
   render();
   if (window.lucide) window.lucide.createIcons();
 });
+
+async function loadCatalogs() {
+  try {
+    const response = await fetch("data/vendors.json");
+    if (!response.ok) return;
+    const data = await response.json();
+    if (Array.isArray(data.vendors)) vendorCatalog = data.vendors;
+  } catch {
+    vendorCatalog = fallbackVendors;
+  }
+}
 
 function bindEvents() {
   $$(".nav-item").forEach((button) => {
@@ -130,7 +196,7 @@ function bindEvents() {
     });
   });
 
-  $("#run-gate").addEventListener("click", runPipeline);
+  $("#run-gate").addEventListener("click", () => runPipeline());
   $("#load-headset").addEventListener("click", () => {
     $("#idea-input").value = "我想要一个夹在桌边的耳机架，还能绕数据线，黑色，不要打孔。";
     runPipeline({
@@ -165,6 +231,16 @@ function hydrateInputs() {
   $("#idea-input").value = state.user_intent || "";
 }
 
+function addHistory(event, actor, note) {
+  if (!Array.isArray(state.history)) state.history = [];
+  state.history.push({
+    at: new Date().toISOString(),
+    event,
+    actor,
+    note,
+  });
+}
+
 function runPipeline(seedAnswers = {}) {
   const intent = $("#idea-input").value.trim();
   if (!intent) return;
@@ -188,6 +264,8 @@ function runPipeline(seedAnswers = {}) {
     delivery_method: "ship_to_home",
     learning: buildLearningSeed(parsed.spec.object_type),
   };
+  addHistory("INTENT_CREATED", "user", "用户输入原始需求。");
+  addHistory(parsed.riskClass === "A" ? "GATE_APPROVED" : "GATE_REVIEW_REQUIRED", "system", `${parsed.riskClass} 类：${parsed.gate.action}`);
 
   if (Object.keys(seedAnswers).length) finishPlanning();
   saveState();
@@ -387,8 +465,12 @@ function finishPlanning() {
   state.spec = enrichSpecWithAnswers(state.spec, state.answers);
   state.realization_mode = chooseMode(state.user_intent, state.spec);
   state.bom = buildBom(state.spec.object_type, state.realization_mode);
-  state.quotes = buildQuotes(state.spec.object_type);
+  state.quote_inputs = buildQuoteInputs(state.spec.object_type, state.answers);
+  state.quotes = buildQuotes(state.spec.object_type, state.quote_inputs);
   state.vendors = buildVendors();
+  state.last_action_message = "报价已由本地 quote engine 计算，仍属于模拟履约。";
+  addHistory("SPEC_GENERATED", "system", "规格书和 BOM 已生成。");
+  addHistory("QUOTE_GENERATED", "quote_engine", "由材料、打印时间、人工、物流、平台费和重做风险计算报价。");
   saveState();
   render();
   setTab("quote");
@@ -468,75 +550,144 @@ function item(name, type, quantity, spec, trust, status) {
   };
 }
 
-function buildQuotes(objectType) {
-  const isHeadset = objectType === "桌边夹式耳机架";
+function buildQuoteInputs(objectType, answers = {}) {
+  const profile = quoteProfiles[objectType] || quoteProfiles.default;
+  const loadText = String(answers.load_weight || "").toLowerCase();
+  const heavyLoadFactor = matches(loadText, ["重", "heavy", "500g", "600g"]) ? 1.15 : 1;
+  return {
+    buy: { ...profile.buy },
+    print: {
+      ...profile.print,
+      materialGrams: Math.round(profile.print.materialGrams * heavyLoadFactor),
+      printHours: roundMoney(profile.print.printHours * heavyLoadFactor),
+    },
+    hybrid: {
+      ...profile.hybrid,
+      materialGrams: Math.round(profile.hybrid.materialGrams * heavyLoadFactor),
+      printHours: roundMoney(profile.hybrid.printHours * heavyLoadFactor),
+    },
+  };
+}
+
+function buildQuotes(objectType, quoteInputs = buildQuoteInputs(objectType)) {
+  const buyCosts = calculateBuyQuote(quoteInputs.buy);
+  const printCosts = calculateManufacturingQuote(quoteInputs.print);
+  const hybridCosts = calculateManufacturingQuote(quoteInputs.hybrid);
+
   return [
     {
       id: "buy",
       name: "方案 A：直接购买",
       badge: "最快",
-      final_price: isHeadset ? 21.8 : 18.6,
-      delivery: "2-4 天",
-      trust: 82,
+      final_price: buyCosts.final_price,
+      delivery: quoteInputs.buy.delivery,
+      trust: quoteInputs.buy.trust,
       risk: "低",
       customization: "低",
       user_work: "按普通商品安装",
       refundable: "取决于商户",
       recommended: false,
-      costs: { product: 12, shipping: 5.5, tax: 1.2, platform: 2.1, manufacturing: 0, packaging: 1, rework: 0 },
+      costs: buyCosts.costs,
       reasons: ["交付快", "售后简单", "不保证完全贴合桌板尺寸"],
     },
     {
       id: "print",
       name: "方案 B：全 3D 打印",
       badge: "最定制",
-      final_price: isHeadset ? 28.9 : 24.4,
-      delivery: "3-6 天",
-      trust: 76,
+      final_price: printCosts.final_price,
+      delivery: quoteInputs.print.delivery,
+      trust: quoteInputs.print.trust,
       risk: "中低",
       customization: "高",
       user_work: "可能需要简单打磨或试装",
       refundable: "可重打一次",
       recommended: false,
-      costs: { product: 0, shipping: 5.5, tax: 1.6, platform: 3.1, manufacturing: 13.2, packaging: 2.2, rework: 3.3 },
+      costs: printCosts.costs,
       reasons: ["尺寸贴合", "材料和夹持强度需要验证", "失败重打成本较高"],
     },
     {
       id: "hybrid",
       name: "方案 C：混合方案",
       badge: "推荐",
-      final_price: isHeadset ? 31.6 : 27.8,
-      delivery: "3-5 天",
-      trust: 91,
+      final_price: hybridCosts.final_price,
+      delivery: quoteInputs.hybrid.delivery,
+      trust: quoteInputs.hybrid.trust,
       risk: "低",
       customization: "高",
       user_work: "贴防滑垫并旋紧固定件",
       refundable: "可补件或重打",
       recommended: true,
-      costs: { product: 4.8, shipping: 5.5, tax: 1.9, platform: 3.2, manufacturing: 11.5, packaging: 2.1, rework: 2.6 },
+      costs: hybridCosts.costs,
       reasons: ["打印主体 + 标准件更稳", "保留定制尺寸", "采购和质检路径清晰"],
     },
   ];
 }
 
+function calculateBuyQuote(input) {
+  const base = input.productCost + input.shippingCost + input.packagingCost;
+  const tax = base * input.taxRate;
+  const platform = base * input.platformFeeRate;
+  const rework = base * input.reworkRiskRate;
+  return {
+    final_price: roundMoney(base + tax + platform + rework),
+    costs: {
+      product: roundMoney(input.productCost),
+      material: 0,
+      machine: 0,
+      labor: 0,
+      standard_parts: 0,
+      manufacturing: 0,
+      packaging: roundMoney(input.packagingCost),
+      shipping: roundMoney(input.shippingCost),
+      tax: roundMoney(tax),
+      platform: roundMoney(platform),
+      rework: roundMoney(rework),
+    },
+  };
+}
+
+function calculateManufacturingQuote(input) {
+  const material = input.materialGrams * input.materialCostPerGram;
+  const machine = input.printHours * input.machineHourlyRate;
+  const labor = (input.laborMinutes / 60) * input.laborHourlyRate;
+  const manufacturing = material + machine + labor;
+  const base = manufacturing + input.standardPartsCost + input.packagingCost + input.shippingCost;
+  const tax = base * input.taxRate;
+  const platform = base * input.platformFeeRate;
+  const rework = base * input.reworkRiskRate;
+  return {
+    final_price: roundMoney(base + tax + platform + rework),
+    costs: {
+      product: 0,
+      material: roundMoney(material),
+      machine: roundMoney(machine),
+      labor: roundMoney(labor),
+      standard_parts: roundMoney(input.standardPartsCost),
+      manufacturing: roundMoney(manufacturing),
+      packaging: roundMoney(input.packagingCost),
+      shipping: roundMoney(input.shippingCost),
+      tax: roundMoney(tax),
+      platform: roundMoney(platform),
+      rework: roundMoney(rework),
+    },
+  };
+}
+
+function roundMoney(value) {
+  return Number(value.toFixed(2));
+}
+
 function buildVendors() {
-  return [
-    {
-      name: "认证标准件箱",
-      score: 95,
-      note: "螺丝、螺母、防滑垫、包装盒有库存记录。",
-    },
-    {
-      name: "本地打印点 A",
-      score: 88,
-      note: "PETG/PLA 小件稳定，支持拍照质检。",
-    },
-    {
-      name: "审核过的平台商户",
-      score: 82,
-      note: "可追踪物流，支持退换货，价格无异常低值。",
-    },
-  ];
+  return vendorCatalog.map((vendor) => ({
+    vendor_id: vendor.vendor_id,
+    name: vendor.name,
+    score: vendor.trust_score ?? vendor.score,
+    note: vendor.note || `${vendor.capabilities?.join(", ") || "通用能力"}；平均 ${vendor.average_turnaround_days || "-"} 天。`,
+    capabilities: vendor.capabilities || [],
+    failure_rate: vendor.failure_rate,
+    qc_supported: Boolean(vendor.qc_supported),
+    photo_record_supported: Boolean(vendor.photo_record_supported),
+  }));
 }
 
 function buildQc(objectType) {
@@ -619,35 +770,69 @@ function renderGate() {
   meter.className = `gate-meter ${state.gate.level || "low"}`;
 }
 
+function clearNode(node) {
+  node.replaceChildren();
+}
+
+function textEl(tag, text, className) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  node.textContent = valueText(text);
+  return node;
+}
+
+function valueText(value) {
+  if (value == null || value === "") return "-";
+  return String(value);
+}
+
+function appendEmptyState(container, message, tag = "div") {
+  clearNode(container);
+  const empty = textEl(tag, message, "empty-state");
+  container.append(empty);
+}
+
+function appendIcon(container, name) {
+  const icon = document.createElement("i");
+  icon.dataset.lucide = name;
+  container.append(icon);
+  return icon;
+}
+
+function safeClassToken(value) {
+  return String(value || "").replace(/[^a-z0-9_-]/gi, "");
+}
+
 function renderQuestions() {
   const form = $("#clarification-form");
   $("#question-count").textContent = `${state.questions.length}/3`;
+  clearNode(form);
 
   if (!state.questions.length) {
-    form.innerHTML = `<div class="empty-state">当前请求未进入自动追问流程。</div>`;
+    form.append(textEl("div", "当前请求未进入自动追问流程。", "empty-state"));
     return;
   }
 
-  form.innerHTML = state.questions
-    .map(
-      (question) => `
-        <label>
-          ${question.label}
-          <input name="${question.id}" value="${escapeHtml(state.answers[question.id] || "")}" placeholder="${question.placeholder}" />
-        </label>
-      `
-    )
-    .join("");
+  state.questions.forEach((question) => {
+    const label = document.createElement("label");
+    label.append(document.createTextNode(valueText(question.label)));
+    const input = document.createElement("input");
+    input.name = question.id;
+    input.value = state.answers[question.id] || "";
+    input.placeholder = question.placeholder || "";
+    label.append(input);
+    form.append(label);
+  });
 
-  form.insertAdjacentHTML(
-    "beforeend",
-    `<div class="form-actions">
-      <button class="primary-button" type="submit">
-        <i data-lucide="file-check-2"></i>
-        <span>生成规格与报价</span>
-      </button>
-    </div>`
-  );
+  const actions = document.createElement("div");
+  actions.className = "form-actions";
+  const button = document.createElement("button");
+  button.className = "primary-button";
+  button.type = "submit";
+  appendIcon(button, "file-check-2");
+  button.append(textEl("span", "生成规格与报价"));
+  actions.append(button);
+  form.append(actions);
 }
 
 function renderSpec() {
@@ -664,16 +849,14 @@ function renderSpec() {
     ["验收标准", listText(spec.acceptance)],
   ];
 
-  $("#spec-sheet").innerHTML = rows
-    .map(
-      ([label, value]) => `
-        <div class="spec-row">
-          <span>${label}</span>
-          <span>${value}</span>
-        </div>
-      `
-    )
-    .join("");
+  const container = $("#spec-sheet");
+  clearNode(container);
+  rows.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "spec-row";
+    row.append(textEl("span", label), textEl("span", value));
+    container.append(row);
+  });
 }
 
 function renderDecision() {
@@ -688,85 +871,110 @@ function renderDecision() {
 
   const active = state.realization_mode === "buy" ? "buy" : state.realization_mode === "print" ? "print" : state.realization_mode === "hybrid" ? "hybrid" : state.risk_class === "A" ? "modify" : "review";
 
-  $("#decision-map").innerHTML = steps
-    .map(
-      ([id, title, label, icon]) => `
-        <div class="decision-step ${id === active ? "active" : ""}">
-          <i data-lucide="${icon}"></i>
-          <div>
-            <strong>${title}</strong>
-            <span>${label}</span>
-          </div>
-          ${id === active ? '<i data-lucide="check-circle-2"></i>' : ""}
-        </div>
-      `
-    )
-    .join("");
+  const map = $("#decision-map");
+  clearNode(map);
+  steps.forEach(([id, title, label, icon]) => {
+    const step = document.createElement("div");
+    step.className = `decision-step ${id === active ? "active" : ""}`.trim();
+    appendIcon(step, icon);
+
+    const copy = document.createElement("div");
+    copy.append(textEl("strong", title), textEl("span", label));
+    step.append(copy);
+
+    if (id === active) appendIcon(step, "check-circle-2");
+    map.append(step);
+  });
 }
 
 function renderBom() {
   const body = $("#bom-body");
+  clearNode(body);
   if (!state.bom.length) {
-    body.innerHTML = `<tr><td colspan="6">等待规格书与现实化方案。</td></tr>`;
+    const row = document.createElement("tr");
+    const cell = textEl("td", "等待规格书与现实化方案。");
+    cell.colSpan = 6;
+    row.append(cell);
+    body.append(row);
     return;
   }
 
-  body.innerHTML = state.bom
-    .map(
-      (item) => `
-        <tr>
-          <td><strong>${item.name}</strong></td>
-          <td><span class="type-pill ${item.type}">${typeLabel(item.type)}</span></td>
-          <td>${item.quantity}</td>
-          <td>${item.spec}</td>
-          <td>${item.trust_score}</td>
-          <td>${statusLabel(item.source_status)}</td>
-        </tr>
-      `
-    )
-    .join("");
+  state.bom.forEach((item) => {
+    const row = document.createElement("tr");
+    const nameCell = document.createElement("td");
+    nameCell.append(textEl("strong", item.name));
+
+    const typeCell = document.createElement("td");
+    const typePill = textEl("span", typeLabel(item.type), `type-pill ${safeClassToken(item.type)}`);
+    typeCell.append(typePill);
+
+    row.append(
+      nameCell,
+      typeCell,
+      textEl("td", item.quantity),
+      textEl("td", item.spec),
+      textEl("td", item.trust_score),
+      textEl("td", statusLabel(item.source_status))
+    );
+    body.append(row);
+  });
 }
 
 function renderQuotes() {
   const grid = $("#quote-grid");
+  clearNode(grid);
   if (["B", "C", "D"].includes(state.risk_class)) {
-    grid.innerHTML = `<div class="empty-state">该请求未通过 A 类自动处理门槛，报价需转人工或拒绝。</div>`;
+    grid.append(textEl("div", "该请求未通过 A 类自动处理门槛，报价需转人工或拒绝。", "empty-state"));
     return;
   }
   if (!state.quotes.length) {
-    grid.innerHTML = `<div class="empty-state">补充关键参数后生成 2-3 个现实化方案。</div>`;
+    grid.append(textEl("div", "补充关键参数后生成 2-3 个现实化方案。", "empty-state"));
     return;
   }
 
-  grid.innerHTML = state.quotes
-    .map(
-      (quote) => `
-        <article class="quote-card ${quote.recommended ? "recommended" : ""} ${state.selected_quote_id === quote.id ? "selected" : ""}">
-          <div class="quote-title">
-            <h4>${quote.name}</h4>
-            <span class="quote-badge">${quote.badge}</span>
-          </div>
-          <p class="quote-price">$${quote.final_price.toFixed(2)}</p>
-          <div class="quote-meta">
-            <div><span>交付</span><strong>${quote.delivery}</strong></div>
-            <div><span>可信度</span><strong>${quote.trust}</strong></div>
-            <div><span>风险</span><strong>${quote.risk}</strong></div>
-            <div><span>定制</span><strong>${quote.customization}</strong></div>
-          </div>
-          <ul>${quote.reasons.map((reason) => `<li>${reason}</li>`).join("")}</ul>
-          <button class="${state.selected_quote_id === quote.id ? "primary-button" : "secondary-button"}" data-quote-id="${quote.id}">
-            <i data-lucide="${state.selected_quote_id === quote.id ? "check-circle-2" : "circle"}"></i>
-            <span>${state.selected_quote_id === quote.id ? "已确认" : "确认方案"}</span>
-          </button>
-        </article>
-      `
-    )
-    .join("");
+  state.quotes.forEach((quote) => {
+    const article = document.createElement("article");
+    article.className = `quote-card ${quote.recommended ? "recommended" : ""} ${state.selected_quote_id === quote.id ? "selected" : ""}`.trim();
+
+    const title = document.createElement("div");
+    title.className = "quote-title";
+    title.append(textEl("h4", quote.name), textEl("span", quote.badge, "quote-badge"));
+
+    const price = textEl("p", `$${quote.final_price.toFixed(2)}`, "quote-price");
+
+    const meta = document.createElement("div");
+    meta.className = "quote-meta";
+    [
+      ["交付", quote.delivery],
+      ["可信度", quote.trust],
+      ["风险", quote.risk],
+      ["定制", quote.customization],
+    ].forEach(([label, value]) => {
+      const item = document.createElement("div");
+      item.append(textEl("span", label), textEl("strong", value));
+      meta.append(item);
+    });
+
+    const reasons = document.createElement("ul");
+    quote.reasons.forEach((reason) => reasons.append(textEl("li", reason)));
+
+    const button = document.createElement("button");
+    button.className = state.selected_quote_id === quote.id ? "primary-button" : "secondary-button";
+    button.dataset.quoteId = quote.id;
+    appendIcon(button, state.selected_quote_id === quote.id ? "check-circle-2" : "circle");
+    button.append(textEl("span", state.selected_quote_id === quote.id ? "已确认" : "确认方案"));
+
+    article.append(title, price, meta, reasons, button);
+    grid.append(article);
+  });
 
   $$("[data-quote-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selected_quote_id = button.dataset.quoteId;
       state.status = "USER_APPROVED";
+      state.last_action_message = "用户已确认方案；下一步为模拟支付托管。";
+      const selected = state.quotes.find((quote) => quote.id === state.selected_quote_id);
+      addHistory("QUOTE_SELECTED", "user", selected ? `${selected.name}，到手价 $${selected.final_price.toFixed(2)}` : "用户选择了报价方案。");
       saveState();
       render();
     });
@@ -775,31 +983,34 @@ function renderQuotes() {
 
 function renderVendors() {
   const vendors = state.vendors.length ? state.vendors : buildVendors();
-  $("#vendor-list").innerHTML = vendors
-    .map(
-      (vendor) => `
-        <div class="vendor-item">
-          <div>
-            <strong>${vendor.name}</strong>
-            <p>${vendor.note}</p>
-          </div>
-          <span class="vendor-score">${vendor.score}</span>
-        </div>
-      `
-    )
-    .join("");
+  const list = $("#vendor-list");
+  clearNode(list);
+  vendors.forEach((vendor) => {
+    const item = document.createElement("div");
+    item.className = "vendor-item";
+    const copy = document.createElement("div");
+    copy.append(textEl("strong", vendor.name), textEl("p", vendor.note));
+    item.append(copy, textEl("span", vendor.score, "vendor-score"));
+    list.append(item);
+  });
 }
 
 function renderCosts() {
   const selected = state.quotes.find((quote) => quote.id === state.selected_quote_id) || state.quotes.find((quote) => quote.recommended);
   const costs = selected?.costs;
+  const list = $("#cost-list");
+  clearNode(list);
   if (!costs) {
-    $("#cost-list").innerHTML = `<li>商品价格 + 运费 + 税费 + 平台手续费 + 制造费用 + 包装费用 + 失败重做风险。</li>`;
+    list.append(textEl("li", "商品价格 + 运费 + 税费 + 平台手续费 + 制造费用 + 包装费用 + 失败重做风险。"));
     return;
   }
 
   const rows = [
     ["商品价格", costs.product],
+    ["材料费用", costs.material],
+    ["机器时间", costs.machine],
+    ["人工费用", costs.labor],
+    ["标准件", costs.standard_parts],
     ["运费", costs.shipping],
     ["税费", costs.tax],
     ["平台手续费", costs.platform],
@@ -808,42 +1019,47 @@ function renderCosts() {
     ["失败重做风险", costs.rework],
   ];
 
-  $("#cost-list").innerHTML = rows.map(([label, value]) => `<li>${label}: $${value.toFixed(2)}</li>`).join("");
+  rows.forEach(([label, value]) => list.append(textEl("li", `${label}: $${Number(value || 0).toFixed(2)}`)));
 }
 
 function renderTimeline() {
   const index = statuses.indexOf(state.status);
-  $("#status-timeline").innerHTML = statuses
-    .map((status, statusIndex) => {
-      const isDone = index >= 0 && statusIndex < index;
-      const isCurrent = statusIndex === index;
-      return `
-        <div class="timeline-step ${isDone ? "done" : ""} ${isCurrent ? "current" : ""}">
-          <span class="timeline-dot"></span>
-          <strong>${status}</strong>
-        </div>
-      `;
-    })
-    .join("");
+  const timeline = $("#status-timeline");
+  clearNode(timeline);
+  statuses.forEach((status, statusIndex) => {
+    const isDone = index >= 0 && statusIndex < index;
+    const isCurrent = statusIndex === index;
+    const step = document.createElement("div");
+    step.className = `timeline-step ${isDone ? "done" : ""} ${isCurrent ? "current" : ""}`.trim();
+    const dot = document.createElement("span");
+    dot.className = "timeline-dot";
+    step.append(dot, textEl("strong", status));
+    timeline.append(step);
+  });
+  const note = $("#state-note");
+  const check = canAdvance();
+  note.textContent = state.last_action_message || check.reason;
+  note.title = check.allowed ? `下一步：${check.next || "无"}` : check.reason;
 }
 
 function renderQc() {
   const list = $("#qc-list");
+  clearNode(list);
   if (!state.qc_requirements.length) {
-    list.innerHTML = `<div class="empty-state">生成 Ticket 后会显示质检清单。</div>`;
+    list.append(textEl("div", "生成 Ticket 后会显示质检清单。", "empty-state"));
     return;
   }
 
-  list.innerHTML = state.qc_requirements
-    .map(
-      (item) => `
-        <label class="qc-item">
-          <input type="checkbox" data-qc-id="${item.id}" ${item.passed ? "checked" : ""} />
-          <span>${item.label}</span>
-        </label>
-      `
-    )
-    .join("");
+  state.qc_requirements.forEach((item) => {
+    const label = document.createElement("label");
+    label.className = "qc-item";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.dataset.qcId = item.id;
+    input.checked = Boolean(item.passed);
+    label.append(input, textEl("span", item.label));
+    list.append(label);
+  });
 
   $$("[data-qc-id]").forEach((box) => {
     box.addEventListener("change", () => {
@@ -856,29 +1072,25 @@ function renderQc() {
 }
 
 function renderPackage() {
-  $("#package-grid").innerHTML = state.package_items
-    .map(
-      (item) => `
-        <div class="package-item">
-          <strong>${item.name}</strong>
-          <p>${item.note}</p>
-        </div>
-      `
-    )
-    .join("");
+  const grid = $("#package-grid");
+  clearNode(grid);
+  state.package_items.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "package-item";
+    card.append(textEl("strong", item.name), textEl("p", item.note));
+    grid.append(card);
+  });
 }
 
 function renderLearning() {
-  $("#learning-list").innerHTML = state.learning
-    .map(
-      (item) => `
-        <div class="learning-item">
-          <strong>${item.title}</strong>
-          <p>${item.note}</p>
-        </div>
-      `
-    )
-    .join("");
+  const list = $("#learning-list");
+  clearNode(list);
+  state.learning.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "learning-item";
+    card.append(textEl("strong", item.title), textEl("p", item.note));
+    list.append(card);
+  });
 }
 
 function renderJson() {
@@ -889,19 +1101,111 @@ function advanceStatus() {
   const current = statuses.indexOf(state.status);
   if (current < 0 || current >= statuses.length - 1) return;
 
-  if (state.status === "QUOTED" && !state.selected_quote_id) {
-    setTab("quote");
+  const check = canAdvance();
+  if (!check.allowed) {
+    state.last_action_message = check.reason;
+    if (state.status === "QUOTED") setTab("quote");
+    saveState();
+    render();
     return;
   }
 
-  state.status = statuses[current + 1];
+  state.status = check.next || statuses[current + 1];
+  state.last_action_message = `模拟状态推进：${statuses[current]} -> ${state.status}`;
+  addHistory("STATUS_ADVANCED", "operator", state.last_action_message);
   saveState();
   render();
+}
+
+function canAdvance() {
+  const next = statuses[statuses.indexOf(state.status) + 1];
+  const hasBom = state.bom.length > 0;
+  const hasQuotes = state.quotes.length > 0;
+  const hasSelectedQuote = Boolean(state.selected_quote_id);
+  const qcPassed = state.qc_requirements.length > 0 && state.qc_requirements.every((item) => item.passed);
+  const packageReady = state.package_items.length > 0;
+
+  const checks = {
+    DRAFT: {
+      allowed: Boolean(state.user_intent && state.risk_class === "A"),
+      reason: "需要先输入需求并通过 Reality Gate。",
+      next,
+    },
+    NEEDS_CLARIFICATION: {
+      allowed: false,
+      reason: "需要先补齐关键参数并生成规格与报价。",
+      next: "QUOTED",
+    },
+    SAFE_APPROVED: {
+      allowed: Boolean(state.spec?.object_type),
+      reason: "需要可用规格书。",
+      next,
+    },
+    PLANNED: {
+      allowed: hasBom && hasQuotes,
+      reason: "需要 BOM 和报价方案。",
+      next,
+    },
+    QUOTED: {
+      allowed: hasSelectedQuote,
+      reason: "需要用户先确认一个报价方案。",
+      next: "USER_APPROVED",
+    },
+    USER_APPROVED: {
+      allowed: hasSelectedQuote,
+      reason: "需要已确认方案；当前为模拟支付托管。",
+      next: "PAID_HELD",
+    },
+    PAID_HELD: {
+      allowed: state.risk_class === "A" && hasSelectedQuote,
+      reason: "需要付款托管成功且无高风险项。",
+      next: "SOURCING",
+    },
+    SOURCING: {
+      allowed: hasBom,
+      reason: "需要 BOM 采购/库存项可用。",
+      next: "PRINTING",
+    },
+    PRINTING: {
+      allowed: state.bom.some((item) => item.type === "print"),
+      reason: "需要至少一个打印件或转为纯购买履约。",
+      next: "ASSEMBLY",
+    },
+    ASSEMBLY: {
+      allowed: packageReady && state.qc_requirements.length > 0,
+      reason: "需要交付包和质检清单。",
+      next: "QC_PENDING",
+    },
+    QC_PENDING: {
+      allowed: qcPassed,
+      reason: "需要 QC 全部通过才能进入包装。",
+      next: "PACKING",
+    },
+    PACKING: {
+      allowed: packageReady,
+      reason: "需要交付包完整。",
+      next: "SHIPPED",
+    },
+    SHIPPED: {
+      allowed: hasSelectedQuote,
+      reason: "需要物流追踪事件；当前为模拟送达。",
+      next: "DELIVERED",
+    },
+    DELIVERED: {
+      allowed: false,
+      reason: "需要用户保存验收反馈后才能 ACCEPTED 或 REWORK_REQUESTED。",
+      next: "ACCEPTED",
+    },
+  };
+
+  return checks[state.status] || { allowed: false, reason: "当前状态没有可模拟推进的下一步。", next };
 }
 
 function markQcPassed() {
   state.qc_requirements = state.qc_requirements.map((item) => ({ ...item, passed: true }));
   state.status = "PACKING";
+  state.last_action_message = "QC 全部通过，模拟进入包装。";
+  addHistory("QC_PASSED", "operator", "外观、尺寸、功能、配件和照片记录已模拟通过。");
   saveState();
   render();
 }
@@ -917,6 +1221,8 @@ function saveFeedback() {
     },
     ...state.learning,
   ];
+  state.last_action_message = result === "稳定可用" ? "用户验收通过，订单完成。" : "用户反馈触发重做/售后流程。";
+  addHistory("FEEDBACK_SAVED", "user", `${result}：${note}`);
   $("#feedback-note").value = "";
   saveState();
   render();
@@ -990,13 +1296,4 @@ function listText(values) {
 
 function matches(text, keywords) {
   return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
-}
-
-function escapeHtml(value) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }

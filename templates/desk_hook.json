@@ -1,0 +1,9 @@
+{
+  "template_id": "desk_hook_v1",
+  "name": "轻量桌边挂钩",
+  "risk_class": "A",
+  "required_measurements": ["desk_thickness", "load_weight", "priority"],
+  "print_parts": ["hook_body", "clamp_lip"],
+  "buy_parts": ["rubber_pad"],
+  "qc": ["dimension_check", "light_load_check", "edge_check", "photo_record"]
+}

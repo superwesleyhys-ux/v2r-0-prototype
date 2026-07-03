@@ -1,0 +1,37 @@
+{
+  "vendors": [
+    {
+      "vendor_id": "standard_parts_bin",
+      "name": "认证标准件箱",
+      "capabilities": ["m4_screws", "m4_nuts", "rubber_pads", "packaging"],
+      "trust_score": 95,
+      "qc_supported": true,
+      "photo_record_supported": true,
+      "average_turnaround_days": 1,
+      "failure_rate": 0.02,
+      "note": "螺丝、螺母、防滑垫、包装盒有库存记录。"
+    },
+    {
+      "vendor_id": "local_print_a",
+      "name": "本地打印点 A",
+      "capabilities": ["PLA", "PETG", "small_parts"],
+      "trust_score": 88,
+      "qc_supported": true,
+      "photo_record_supported": true,
+      "average_turnaround_days": 3,
+      "failure_rate": 0.07,
+      "note": "PETG/PLA 小件稳定，支持拍照质检。"
+    },
+    {
+      "vendor_id": "approved_marketplace_vendor",
+      "name": "审核过的平台商户",
+      "capabilities": ["finished_goods", "tracked_shipping", "returns"],
+      "trust_score": 82,
+      "qc_supported": false,
+      "photo_record_supported": false,
+      "average_turnaround_days": 4,
+      "failure_rate": 0.05,
+      "note": "可追踪物流，支持退换货，价格无异常低值。"
+    }
+  ]
+}
