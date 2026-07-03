@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { healthPayload } from "../api/health.js";
 import { structureTicket } from "../api/structureTicketCore.js";
 
 const localMockEnv = { V2R_USE_LOCAL_AI_MOCK: "1" };
@@ -105,6 +106,23 @@ await test("invalid AI JSON schema -> 502", async () => {
 
   assert.equal(response.status, 502);
   assert.equal(response.body.code, "SCHEMA_VALIDATION_FAILED");
+});
+
+await test("health payload exposes deployment diagnostics", async () => {
+  const payload = healthPayload({
+    OPENAI_API_KEY: "test-key",
+    OPENAI_MODEL: "test-model",
+    V2R_USE_LOCAL_AI_MOCK: "1",
+    V2R_ALLOWED_ORIGINS: "https://superwesleyhys-ux.github.io",
+  });
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.service, "v2r-api");
+  assert.equal(payload.keyConfigured, true);
+  assert.equal(payload.modelConfigured, true);
+  assert.equal(payload.model, "test-model");
+  assert.equal(payload.mockMode, true);
+  assert.equal(payload.allowedOriginsConfigured, true);
 });
 
 async function test(name, fn) {

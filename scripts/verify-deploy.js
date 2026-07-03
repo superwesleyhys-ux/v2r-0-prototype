@@ -40,7 +40,10 @@ async function verifyHealth() {
   assert(status === 200, `Expected 200, got ${status}`);
   assert(json.ok === true, "Expected ok=true");
   assert(json.service === "v2r-api", `Expected service=v2r-api, got ${json.service}`);
+  assert(json.keyConfigured === true, "keyConfigured is false. Configure OPENAI_API_KEY in Vercel.");
   assert(json.modelConfigured === true, "modelConfigured is false. Configure OPENAI_API_KEY and OPENAI_MODEL in Vercel.");
+  assert(typeof json.model === "string" && json.model.length > 0, "Expected non-empty model name");
+  assert(json.allowedOriginsConfigured === true, "allowedOriginsConfigured is false. Include the GitHub Pages origin in V2R_ALLOWED_ORIGINS.");
 }
 
 async function verifyCorsPreflight() {

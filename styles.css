@@ -345,6 +345,7 @@ select:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 10px;
   min-height: 42px;
@@ -368,6 +369,23 @@ select:focus {
 
 .api-base-panel strong {
   overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.api-base-controls {
+  display: flex;
+  align-items: center;
+  flex: 1 1 390px;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: min(100%, 320px);
+}
+
+.api-base-controls input {
+  flex: 1 1 240px;
+  min-width: 180px;
+  min-height: 34px;
+  padding: 0 10px;
   font-size: 13px;
 }
 

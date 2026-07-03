@@ -103,10 +103,17 @@
                   <span>当前 API Base</span>
                   <strong id="api-base-value">同域 /api</strong>
                 </div>
-                <button class="secondary-button compact" id="clear-api-base" title="清除 API Base" aria-label="清除 API Base">
-                  <i data-lucide="x"></i>
-                  <span>清除</span>
-                </button>
+                <div class="api-base-controls">
+                  <input id="api-base-input" type="url" placeholder="https://your-v2r-api.vercel.app" aria-label="API Base URL">
+                  <button class="secondary-button compact" id="save-api-base" title="保存 API Base" aria-label="保存 API Base">
+                    <i data-lucide="save"></i>
+                    <span>保存</span>
+                  </button>
+                  <button class="secondary-button compact" id="clear-api-base" title="清除 API Base" aria-label="清除 API Base">
+                    <i data-lucide="x"></i>
+                    <span>清除</span>
+                  </button>
+                </div>
               </div>
             </section>
 

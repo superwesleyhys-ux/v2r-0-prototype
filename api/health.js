@@ -1,5 +1,5 @@
 import { DEFAULT_OPENAI_MODEL } from "./structureTicketCore.js";
-import { setCors } from "./http.js";
+import { getAllowedOrigins, setCors } from "./http.js";
 
 export default function handler(req, res) {
   setCors(req, res);
@@ -16,9 +16,16 @@ export default function handler(req, res) {
 }
 
 export function healthPayload(env = process.env) {
+  const keyConfigured = Boolean(env.OPENAI_API_KEY);
+  const model = env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
+  const allowedOrigins = getAllowedOrigins(env);
   return {
     ok: true,
     service: "v2r-api",
-    modelConfigured: Boolean(env.OPENAI_API_KEY && (env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL)),
+    keyConfigured,
+    modelConfigured: Boolean(keyConfigured && model),
+    model,
+    mockMode: env.V2R_USE_LOCAL_AI_MOCK === "1",
+    allowedOriginsConfigured: allowedOrigins.has("https://superwesleyhys-ux.github.io"),
   };
 }

@@ -52,7 +52,15 @@ The front end calls `/api/structure-ticket`. `server.mjs` forwards that request 
 
 GitHub Pages remains a static public demo. The API-backed button only works when this project is served by `server.mjs` or a deployed backend with `OPENAI_API_KEY` and `OPENAI_MODEL` configured.
 
-If the front end is on GitHub Pages and the API is deployed elsewhere, set the API base URL at runtime:
+If the front end is on GitHub Pages and the API is deployed elsewhere, enter the Vercel URL in the page's `API Base` field and click `保存`.
+
+You can also preconfigure the public page with a URL parameter:
+
+```text
+https://superwesleyhys-ux.github.io/v2r-0-prototype/?apiBase=https%3A%2F%2Fyour-v2r-api.vercel.app
+```
+
+Or set it manually in the browser console:
 
 ```js
 localStorage.setItem("v2r_api_base", "https://your-v2r-api.vercel.app");
@@ -74,7 +82,11 @@ Returns:
 {
   "ok": true,
   "service": "v2r-api",
-  "modelConfigured": true
+  "keyConfigured": true,
+  "modelConfigured": true,
+  "model": "gpt-4.1-mini",
+  "mockMode": false,
+  "allowedOriginsConfigured": true
 }
 ```
 
@@ -177,6 +189,14 @@ Then reload the page. The health check should change the status to `AI API 代�
 - Changed QC marking to wait for the guarded state machine before entering packing.
 - Prevented AI draft tickets with open clarification questions from showing a formal quote too early.
 - Warned GitHub Pages users when same-origin `/api` is selected and `v2r_api_base` still needs to point at Vercel.
+
+## v2r-0.4.2 Public API Setup and Terminal Timeline
+
+- Added an in-page API Base input so GitHub Pages users can connect to a Vercel backend without opening DevTools.
+- Added `?apiBase=` / `?v2r_api_base=` URL parameter support for shareable public demo links.
+- Changed terminal and manual-review timeline rendering to show only `DRAFT -> terminal status`.
+- Normalized AI-generated question ids before using them as form field names.
+- Expanded `/api/health` with key, model, mock mode, and allowed-origin diagnostics.
 
 ## Demo Flow
 

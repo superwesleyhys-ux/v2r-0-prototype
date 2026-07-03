@@ -1,4 +1,4 @@
-# V2R-0.4.1 Deployment Checklist
+# V2R-0.4.2 Deployment Checklist
 
 Use this checklist to verify that GitHub Pages is only the static front end and Vercel is the real AI backend.
 
@@ -52,7 +52,11 @@ Expected JSON:
 {
   "ok": true,
   "service": "v2r-api",
-  "modelConfigured": true
+  "keyConfigured": true,
+  "modelConfigured": true,
+  "model": "gpt-4.1-mini",
+  "mockMode": false,
+  "allowedOriginsConfigured": true
 }
 ```
 
@@ -79,7 +83,21 @@ Open the GitHub Pages front end:
 https://superwesleyhys-ux.github.io/v2r-0-prototype/
 ```
 
-In the browser console:
+Use the page's `API Base` field:
+
+```text
+https://your-vercel-url.vercel.app
+```
+
+Then click `保存`.
+
+For a shareable setup link, URL-encode the API base:
+
+```text
+https://superwesleyhys-ux.github.io/v2r-0-prototype/?apiBase=https%3A%2F%2Fyour-vercel-url.vercel.app
+```
+
+Console fallback:
 
 ```js
 localStorage.setItem("v2r_api_base", "https://your-vercel-url.vercel.app");

@@ -191,6 +191,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 document.addEventListener("DOMContentLoaded", async () => {
+  initializeApiBaseFromUrl();
   await loadCatalogs();
   bindEvents();
   hydrateInputs();
@@ -248,6 +249,7 @@ function bindEvents() {
   $("#save-feedback").addEventListener("click", saveFeedback);
   $("#export-json").addEventListener("click", exportJson);
   $("#reset-demo").addEventListener("click", resetDemo);
+  $("#save-api-base").addEventListener("click", saveApiBaseFromInput);
   $("#clear-api-base").addEventListener("click", clearApiBase);
 }
 
@@ -333,7 +335,7 @@ async function checkApiHealth() {
 
 function apiBase() {
   const configured = window.V2R_API_BASE || localStorage.getItem("v2r_api_base") || "";
-  return String(configured).replace(/\/$/, "");
+  return normalizeApiBaseUrl(configured);
 }
 
 function apiBaseSource() {
@@ -348,14 +350,53 @@ function needsExternalApiBase() {
 
 function renderApiBaseStatus() {
   const value = $("#api-base-value");
+  const input = $("#api-base-input");
   const clearButton = $("#clear-api-base");
-  if (!value || !clearButton) return;
+  if (!value || !input || !clearButton) return;
 
   const base = apiBase();
   const source = apiBaseSource();
   value.textContent = base || (needsExternalApiBase() ? "同域 /api（GitHub Pages 需设置 v2r_api_base）" : "同域 /api");
+  input.value = source === "localStorage" ? base : "";
   clearButton.disabled = source !== "localStorage";
   clearButton.title = source === "localStorage" ? "清除 API Base" : "当前没有可清除的 localStorage API Base";
+}
+
+function initializeApiBaseFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const rawApiBase = params.get("apiBase") || params.get("v2r_api_base");
+  const normalized = normalizeApiBaseUrl(rawApiBase);
+  if (!normalized) return;
+  localStorage.setItem("v2r_api_base", normalized);
+}
+
+function normalizeApiBaseUrl(value) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+  try {
+    const url = new URL(rawValue);
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+    return url.origin;
+  } catch {
+    return "";
+  }
+}
+
+function saveApiBaseFromInput() {
+  const input = $("#api-base-input");
+  const normalized = normalizeApiBaseUrl(input?.value);
+  if (!normalized) {
+    setAiStatus("API Base 无效：请输入 http:// 或 https:// 开头的后端域名。", "warning");
+    return;
+  }
+  localStorage.setItem("v2r_api_base", normalized);
+  apiHealth = {
+    checked: false,
+    connected: false,
+    modelConfigured: false,
+  };
+  renderApiBaseStatus();
+  checkApiHealth();
 }
 
 function clearApiBase() {
@@ -472,11 +513,40 @@ function normalizeAiSpec(spec = {}, objectType, intent) {
 }
 
 function normalizeAiQuestions(questions = []) {
-  return questions.slice(0, 3).map((question) => ({
-    id: question.id || "clarification",
-    label: question.label || "需要补充的信息",
-    placeholder: question.why_needed || "用于确认现实化参数",
-  }));
+  const usedIds = new Set();
+  return questions.slice(0, 3).map((question, index) => {
+    const id = uniqueFieldId(safeFieldId(question.id, `clarification_${index + 1}`), usedIds);
+    return {
+      id,
+      label: question.label || "需要补充的信息",
+      placeholder: question.why_needed || "用于确认现实化参数",
+    };
+  });
+}
+
+function safeFieldId(value, fallback) {
+  const normalized = String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  return normalized || fallback;
+}
+
+function uniqueFieldId(id, usedIds) {
+  if (!usedIds.has(id)) {
+    usedIds.add(id);
+    return id;
+  }
+  let index = 2;
+  let candidate = `${id}_${index}`;
+  while (usedIds.has(candidate)) {
+    index += 1;
+    candidate = `${id}_${index}`;
+  }
+  usedIds.add(candidate);
+  return candidate;
 }
 
 function normalizeAiBom(bom = []) {
@@ -1352,10 +1422,11 @@ function renderCosts() {
 }
 
 function renderTimeline() {
-  const index = statuses.indexOf(state.status);
+  const timelineStatuses = timelineStatusesForCurrentState();
+  const index = timelineStatuses.indexOf(state.status);
   const timeline = $("#status-timeline");
   clearNode(timeline);
-  statuses.forEach((status, statusIndex) => {
+  timelineStatuses.forEach((status, statusIndex) => {
     const isDone = index >= 0 && statusIndex < index;
     const isCurrent = statusIndex === index;
     const step = document.createElement("div");
@@ -1369,6 +1440,13 @@ function renderTimeline() {
   const check = canAdvance();
   note.textContent = state.last_action_message || check.reason;
   note.title = check.allowed ? `下一步：${check.next || "无"}` : check.reason;
+}
+
+function timelineStatusesForCurrentState() {
+  if (terminalStatuses.includes(state.status)) {
+    return ["DRAFT", state.status];
+  }
+  return fulfillmentStatuses;
 }
 
 function renderQc() {
