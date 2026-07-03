@@ -2,6 +2,13 @@
 
 This static prototype turns the V2R-0 ground flow into a runnable front-end loop.
 
+## Current Architecture
+
+- GitHub Pages is the static front end only.
+- Vercel is the real AI backend for `/api/health` and `/api/structure-ticket`.
+- The OpenAI key must stay server-side in Vercel environment variables.
+- The GitHub Pages front end connects to Vercel through `localStorage.v2r_api_base`.
+
 The core product idea is simple:
 
 > A user writes what they want, and the system turns that intent into a Reality Ticket with safety gating, specification, BOM, quote, fulfillment state, QC, delivery, and feedback learning.
@@ -102,12 +109,20 @@ Response body is a strict V2R Ticket patch with:
 
 GitHub Pages can only run the static front end. The real AI proxy must be deployed to Vercel or another serverless/backend host.
 
+See `DEPLOYMENT_CHECKLIST.md` for the full deployment checklist.
+
 Local Vercel flow:
 
 ```bash
 npm install
 npm run dev
 npm test
+```
+
+Deployment verification:
+
+```bash
+npm run verify:deploy -- https://your-vercel-url.vercel.app
 ```
 
 Vercel environment variables:
@@ -144,6 +159,14 @@ Then reload the page. The health check should change the status to `AI API ‰ª£Áê
 - Enforced that non-A tickets cannot allow quotes.
 - Enforced that `D` and `UNSUPPORTED` tickets cannot generate BOM or automatic procurement.
 - Improved frontend API failure messages for missing backend, missing key, CORS/network failure, non-JSON responses, and schema failures.
+
+## v2r-0.4 Deployment Verification
+
+- Added `DEPLOYMENT_CHECKLIST.md`.
+- Added `scripts/verify-deploy.js`.
+- Added `npm run verify:deploy -- <vercel-url>`.
+- Added front-end API Base display and clear control.
+- Kept GitHub Pages as static front end while making Vercel deployment verification explicit.
 
 ## Demo Flow
 

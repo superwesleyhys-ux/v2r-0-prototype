@@ -189,6 +189,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindEvents();
   hydrateInputs();
   render();
+  renderApiBaseStatus();
   checkApiHealth();
   if (window.lucide) window.lucide.createIcons();
 });
@@ -241,6 +242,7 @@ function bindEvents() {
   $("#save-feedback").addEventListener("click", saveFeedback);
   $("#export-json").addEventListener("click", exportJson);
   $("#reset-demo").addEventListener("click", resetDemo);
+  $("#clear-api-base").addEventListener("click", clearApiBase);
 }
 
 async function requestAiDraft() {
@@ -323,6 +325,35 @@ async function checkApiHealth() {
 function apiBase() {
   const configured = window.V2R_API_BASE || localStorage.getItem("v2r_api_base") || "";
   return String(configured).replace(/\/$/, "");
+}
+
+function apiBaseSource() {
+  if (window.V2R_API_BASE) return "window";
+  if (localStorage.getItem("v2r_api_base")) return "localStorage";
+  return "same-origin";
+}
+
+function renderApiBaseStatus() {
+  const value = $("#api-base-value");
+  const clearButton = $("#clear-api-base");
+  if (!value || !clearButton) return;
+
+  const base = apiBase();
+  const source = apiBaseSource();
+  value.textContent = base || "同域 /api";
+  clearButton.disabled = source !== "localStorage";
+  clearButton.title = source === "localStorage" ? "清除 API Base" : "当前没有可清除的 localStorage API Base";
+}
+
+function clearApiBase() {
+  localStorage.removeItem("v2r_api_base");
+  apiHealth = {
+    checked: false,
+    connected: false,
+    modelConfigured: false,
+  };
+  renderApiBaseStatus();
+  checkApiHealth();
 }
 
 async function parseJsonResponse(response) {
@@ -998,6 +1029,7 @@ function buildLearningSeed(objectType) {
 }
 
 function render() {
+  renderApiBaseStatus();
   renderTopbar();
   renderGate();
   renderQuestions();
