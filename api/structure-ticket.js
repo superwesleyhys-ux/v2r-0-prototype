@@ -17,6 +17,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Invalid JSON request body", code: "INVALID_JSON" });
   }
 
-  const result = await structureTicket({ userIntent: body.userIntent, env: process.env, fetchImpl: fetch });
+  const userIntent = body.userIntent || body.intent;
+  const result = await structureTicket({ userIntent, env: process.env, fetchImpl: fetch });
   return res.status(result.status).json(result.body);
 }

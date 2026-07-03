@@ -1,4 +1,4 @@
-# V2R-0.4 Deployment Checklist
+# V2R-0.4.1 Deployment Checklist
 
 Use this checklist to verify that GitHub Pages is only the static front end and Vercel is the real AI backend.
 
@@ -37,6 +37,8 @@ Run:
 ```bash
 npm run verify:deploy -- https://your-vercel-url.vercel.app
 ```
+
+This verifies `/api/health`, GitHub Pages CORS preflight for `/api/structure-ticket`, low-risk AI structuring, empty input handling, and unsupported procurement handling.
 
 Manual health check:
 

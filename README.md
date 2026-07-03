@@ -168,6 +168,16 @@ Then reload the page. The health check should change the status to `AI API 代�
 - Added front-end API Base display and clear control.
 - Kept GitHub Pages as static front end while making Vercel deployment verification explicit.
 
+## v2r-0.4.1 Deployment and State-Machine Gaps
+
+- Made the Vercel structure endpoint accept both `userIntent` and `intent`.
+- Added GitHub Pages CORS preflight verification to `verify:deploy`.
+- Added CORS headers to the local Node API server for deployment-like checks.
+- Split fulfillment statuses from terminal/manual statuses so simulated advancement follows the real order path.
+- Changed QC marking to wait for the guarded state machine before entering packing.
+- Prevented AI draft tickets with open clarification questions from showing a formal quote too early.
+- Warned GitHub Pages users when same-origin `/api` is selected and `v2r_api_base` still needs to point at Vercel.
+
 ## Demo Flow
 
 1. Click `载入第一单`.

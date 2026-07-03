@@ -1,11 +1,7 @@
 const STORAGE_KEY = "v2r0-reality-ops-state";
 
-const statuses = [
+const fulfillmentStatuses = [
   "DRAFT",
-  "UNSUPPORTED",
-  "REFUSED",
-  "MANUAL_REVIEW",
-  "PROFESSIONAL_REVIEW",
   "NEEDS_CLARIFICATION",
   "SAFE_APPROVED",
   "PLANNED",
@@ -20,9 +16,18 @@ const statuses = [
   "SHIPPED",
   "DELIVERED",
   "ACCEPTED",
+];
+
+const terminalStatuses = [
+  "UNSUPPORTED",
+  "REFUSED",
+  "MANUAL_REVIEW",
+  "PROFESSIONAL_REVIEW",
   "REWORK_REQUESTED",
   "REFUNDED",
 ];
+
+const statuses = [...fulfillmentStatuses, ...terminalStatuses];
 
 const fallbackVendors = [
   {
@@ -168,6 +173,7 @@ const defaultState = () => ({
   delivery_method: "ship_to_home",
   learning: [],
   quote_inputs: null,
+  quote_stage: "none",
   quotes_allowed: false,
   ai_draft: null,
   history: [],
@@ -318,7 +324,10 @@ async function checkApiHealth() {
       connected: false,
       modelConfigured: false,
     };
-    setAiStatus("AI API 代理：未连接，当前为本地规则模式", "warning");
+    setAiStatus(
+      needsExternalApiBase() ? "AI API 代理：未连接，GitHub Pages 需要设置 v2r_api_base 指向 Vercel 后端" : "AI API 代理：未连接，当前为本地规则模式",
+      "warning"
+    );
   }
 }
 
@@ -333,6 +342,10 @@ function apiBaseSource() {
   return "same-origin";
 }
 
+function needsExternalApiBase() {
+  return apiBaseSource() === "same-origin" && window.location.hostname.endsWith("github.io");
+}
+
 function renderApiBaseStatus() {
   const value = $("#api-base-value");
   const clearButton = $("#clear-api-base");
@@ -340,7 +353,7 @@ function renderApiBaseStatus() {
 
   const base = apiBase();
   const source = apiBaseSource();
-  value.textContent = base || "同域 /api";
+  value.textContent = base || (needsExternalApiBase() ? "同域 /api（GitHub Pages 需设置 v2r_api_base）" : "同域 /api");
   clearButton.disabled = source !== "localStorage";
   clearButton.title = source === "localStorage" ? "清除 API Base" : "当前没有可清除的 localStorage API Base";
 }
@@ -400,6 +413,9 @@ function applyAiPatch(patch, intent) {
   const objectType = patch.object_type || patch.spec?.project_name || "待结构化小物件";
   const quotesAllowed = Boolean(patch.quotes_allowed && riskClass === "A");
   const normalizedSpec = normalizeAiSpec(patch.spec, objectType, intent);
+  const normalizedQuestions = normalizeAiQuestions(patch.questions);
+  const needsClarification = riskClass === "A" && normalizedQuestions.length > 0;
+  const quoteInputs = quotesAllowed && !needsClarification ? buildQuoteInputs(normalizedSpec.object_type, {}) : null;
 
   state = {
     ...defaultState(),
@@ -415,13 +431,14 @@ function applyAiPatch(patch, intent) {
       reason: patch.reason || "AI 返回结果缺少原因，需人工复核。",
     },
     spec: normalizedSpec,
-    questions: normalizeAiQuestions(patch.questions),
+    questions: normalizedQuestions,
     answers: {},
     realization_mode: normalizeMode(patch.realization_mode),
     bom: normalizeAiBom(patch.bom),
     quotes_allowed: quotesAllowed,
-    quotes: quotesAllowed ? buildQuotes(normalizedSpec.object_type, buildQuoteInputs(normalizedSpec.object_type, {})) : [],
-    quote_inputs: quotesAllowed ? buildQuoteInputs(normalizedSpec.object_type, {}) : null,
+    quotes: quoteInputs ? buildQuotes(normalizedSpec.object_type, quoteInputs) : [],
+    quote_inputs: quoteInputs,
+    quote_stage: quotesAllowed ? (needsClarification ? "draft_pending_clarification" : "estimated") : "none",
     vendors: quotesAllowed ? buildVendors() : [],
     selected_quote_id: null,
     qc_requirements: riskClass === "A" ? buildQc(normalizedSpec.object_type) : [],
@@ -429,7 +446,7 @@ function applyAiPatch(patch, intent) {
     delivery_method: "ship_to_home",
     learning: buildLearningSeed(normalizedSpec.object_type),
     ai_draft: patch,
-    last_action_message: messageForAiRisk(riskClass, quotesAllowed),
+    last_action_message: messageForAiRisk(riskClass, quotesAllowed, needsClarification),
   };
 
   addHistory("AI_TICKET_STRUCTURED", "openai_proxy", `${riskClass} 类：${state.gate.action}`);
@@ -513,7 +530,8 @@ function riskLevelForAiRisk(riskClass) {
   return levels[riskClass] || "medium";
 }
 
-function messageForAiRisk(riskClass, quotesAllowed) {
+function messageForAiRisk(riskClass, quotesAllowed, needsClarification = false) {
+  if (riskClass === "A" && quotesAllowed && needsClarification) return "AI 已生成结构化 Ticket 草案；先补齐关键参数，再由 quote engine 生成正式预估报价。";
   if (riskClass === "A" && quotesAllowed) return "AI 已生成结构化 Ticket 草案，可继续补充参数并复核报价。";
   if (riskClass === "UNSUPPORTED") return "该请求暂不支持，不生成自动采购、报价或 BOM。";
   if (riskClass === "D") return "该请求被拒绝，不生成自动采购、报价或 BOM。";
@@ -767,6 +785,7 @@ function finishPlanning() {
   state.quote_inputs = buildQuoteInputs(state.spec.object_type, state.answers);
   state.quotes = buildQuotes(state.spec.object_type, state.quote_inputs);
   state.quotes_allowed = true;
+  state.quote_stage = "estimated";
   state.vendors = buildVendors();
   state.last_action_message = "报价已由本地 quote engine 计算，仍属于模拟履约。";
   addHistory("SPEC_GENERATED", "system", "规格书和 BOM 已生成。");
@@ -1230,8 +1249,16 @@ function renderQuotes() {
     return;
   }
   if (!state.quotes.length) {
-    grid.append(textEl("div", "补充关键参数后生成 2-3 个现实化方案。", "empty-state"));
+    const message =
+      state.quote_stage === "draft_pending_clarification"
+        ? "AI 已允许报价，但关键参数未补齐；提交三问后再生成正式预估报价。"
+        : "补充关键参数后生成 2-3 个现实化方案。";
+    grid.append(textEl("div", message, "empty-state"));
     return;
+  }
+
+  if (state.quote_stage === "estimated") {
+    grid.append(textEl("div", "预估报价：由本地 quote engine 根据材料、工时、物流、平台费和失败重做风险计算，仍属于模拟履约。", "quote-stage-note"));
   }
 
   state.quotes.forEach((quote) => {
@@ -1400,8 +1427,8 @@ function renderJson() {
 }
 
 function advanceStatus() {
-  const current = statuses.indexOf(state.status);
-  if (current < 0 || current >= statuses.length - 1) return;
+  const current = fulfillmentStatuses.indexOf(state.status);
+  if (current < 0 || current >= fulfillmentStatuses.length - 1) return;
 
   const check = canAdvance();
   if (!check.allowed) {
@@ -1412,15 +1439,16 @@ function advanceStatus() {
     return;
   }
 
-  state.status = check.next || statuses[current + 1];
-  state.last_action_message = `模拟状态推进：${statuses[current]} -> ${state.status}`;
+  state.status = check.next || fulfillmentStatuses[current + 1];
+  state.last_action_message = `模拟状态推进：${fulfillmentStatuses[current]} -> ${state.status}`;
   addHistory("STATUS_ADVANCED", "operator", state.last_action_message);
   saveState();
   render();
 }
 
 function canAdvance() {
-  const next = statuses[statuses.indexOf(state.status) + 1];
+  const current = fulfillmentStatuses.indexOf(state.status);
+  const next = current >= 0 ? fulfillmentStatuses[current + 1] : null;
   const hasBom = state.bom.length > 0;
   const hasQuotes = state.quotes.length > 0;
   const hasSelectedQuote = Boolean(state.selected_quote_id);
@@ -1505,9 +1533,8 @@ function canAdvance() {
 
 function markQcPassed() {
   state.qc_requirements = state.qc_requirements.map((item) => ({ ...item, passed: true }));
-  state.status = "PACKING";
-  state.last_action_message = "QC 全部通过，模拟进入包装。";
-  addHistory("QC_PASSED", "operator", "外观、尺寸、功能、配件和照片记录已模拟通过。");
+  state.last_action_message = "QC 已全部标记通过，可点击模拟推进进入包装。";
+  addHistory("QC_MARKED_PASSED", "operator", "QC 项已全部勾选，等待状态机推进。");
   saveState();
   render();
 }

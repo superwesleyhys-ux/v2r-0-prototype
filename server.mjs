@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { dirname, extname, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { healthPayload } from "./api/health.js";
+import { getAllowedOrigins } from "./api/http.js";
 import { structureTicket } from "./api/structureTicketCore.js";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
@@ -113,6 +114,8 @@ async function serveStaticFile(url, response, headOnly) {
 }
 
 function handleHealth(request, response) {
+  setNodeCors(request, response);
+
   if (request.method === "OPTIONS") {
     sendJson(response, 204, {});
     return;
@@ -127,6 +130,8 @@ function handleHealth(request, response) {
 }
 
 async function handleStructureTicket(request, response) {
+  setNodeCors(request, response);
+
   if (request.method === "OPTIONS") {
     sendJson(response, 204, {});
     return;
@@ -151,6 +156,17 @@ async function handleStructureTicket(request, response) {
     fetchImpl: fetch,
   });
   sendJson(response, result.status, result.body);
+}
+
+function setNodeCors(request, response) {
+  const origin = request.headers.origin;
+  const allowedOrigins = getAllowedOrigins(process.env);
+  if (allowedOrigins.has(origin)) {
+    response.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  response.setHeader("Vary", "Origin");
+  response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 async function readJsonBody(request) {

@@ -9,6 +9,7 @@ if (!baseUrl) {
 
 const tests = [
   ["GET /api/health", verifyHealth],
+  ["OPTIONS /api/structure-ticket CORS preflight", verifyCorsPreflight],
   ["POST /api/structure-ticket low risk", verifyLowRisk],
   ["POST /api/structure-ticket empty userIntent", verifyEmptyIntent],
   ["POST /api/structure-ticket unsupported procurement", verifyUnsupportedProcurement],
@@ -40,6 +41,23 @@ async function verifyHealth() {
   assert(json.ok === true, "Expected ok=true");
   assert(json.service === "v2r-api", `Expected service=v2r-api, got ${json.service}`);
   assert(json.modelConfigured === true, "modelConfigured is false. Configure OPENAI_API_KEY and OPENAI_MODEL in Vercel.");
+}
+
+async function verifyCorsPreflight() {
+  const response = await fetch(new URL("/api/structure-ticket", `${baseUrl}/`), {
+    method: "OPTIONS",
+    headers: {
+      Origin: "https://superwesleyhys-ux.github.io",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "Content-Type",
+    },
+  });
+
+  const allowOrigin = response.headers.get("access-control-allow-origin");
+  const allowMethods = response.headers.get("access-control-allow-methods") || "";
+  assert(response.status === 204, `Expected 204, got ${response.status}`);
+  assert(allowOrigin === "https://superwesleyhys-ux.github.io", `Expected GitHub Pages allow-origin, got ${allowOrigin || "empty"}`);
+  assert(allowMethods.includes("POST") && allowMethods.includes("OPTIONS"), `Expected POST and OPTIONS in allow-methods, got ${allowMethods || "empty"}`);
 }
 
 async function verifyLowRisk() {
