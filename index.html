@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>V2R-0 Reality Ops</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="rail" aria-label="Workspace">
+        <div class="brand-block">
+          <div class="brand-mark">V2R</div>
+          <div>
+            <p class="eyebrow">Reality Ops</p>
+            <h1>V2R-0</h1>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Primary">
+          <button class="nav-item active" data-tab="intake">
+            <i data-lucide="inbox"></i>
+            <span>输入</span>
+          </button>
+          <button class="nav-item" data-tab="ticket">
+            <i data-lucide="clipboard-list"></i>
+            <span>Ticket</span>
+          </button>
+          <button class="nav-item" data-tab="quote">
+            <i data-lucide="badge-dollar-sign"></i>
+            <span>报价</span>
+          </button>
+          <button class="nav-item" data-tab="fulfillment">
+            <i data-lucide="truck"></i>
+            <span>履约</span>
+          </button>
+          <button class="nav-item" data-tab="learning">
+            <i data-lucide="database"></i>
+            <span>反馈</span>
+          </button>
+        </nav>
+
+        <div class="rail-footer">
+          <button class="icon-button" id="export-json" title="导出 Ticket JSON" aria-label="导出 Ticket JSON">
+            <i data-lucide="download"></i>
+          </button>
+          <button class="icon-button" id="reset-demo" title="重置演示" aria-label="重置演示">
+            <i data-lucide="rotate-ccw"></i>
+          </button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">人工增强 MVP</p>
+            <h2>一句话需求到现实化订单</h2>
+          </div>
+          <div class="ticket-chip">
+            <span id="ticket-id">V2R-0001</span>
+            <strong id="ticket-status">DRAFT</strong>
+          </div>
+        </header>
+
+        <section class="tab-panel active" id="tab-intake">
+          <div class="content-grid intake-grid">
+            <section class="surface intake-main">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">User Intent</p>
+                  <h3>写下你想现实化的东西</h3>
+                </div>
+                <span class="small-tag">最多追问 3 个参数</span>
+              </div>
+
+              <textarea id="idea-input" rows="5" placeholder="例如：我想要一个夹在桌边的耳机架，还能绕数据线，黑色，不要打孔。"></textarea>
+
+              <div class="sample-row" aria-label="Examples">
+                <button class="text-button sample-idea" data-idea="我想要一个夹在桌边的耳机架，还能绕数据线，黑色，不要打孔。">耳机架</button>
+                <button class="text-button sample-idea" data-idea="我想做一个宿舍桌面的线缆管理夹，可以贴在桌下，白色，能固定三根线。">线缆夹</button>
+                <button class="text-button sample-idea" data-idea="我需要一个儿童餐具，能固定在宝宝餐椅上。">高风险示例</button>
+              </div>
+
+              <div class="action-row">
+                <button class="primary-button" id="run-gate">
+                  <i data-lucide="wand-sparkles"></i>
+                  <span>生成 Reality Ticket</span>
+                </button>
+                <button class="secondary-button" id="load-headset">
+                  <i data-lucide="sparkles"></i>
+                  <span>载入第一单</span>
+                </button>
+              </div>
+            </section>
+
+            <section class="surface gate-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Reality Gate</p>
+                  <h3>安全与可行性</h3>
+                </div>
+                <span class="risk-pill risk-low" id="risk-pill">未评估</span>
+              </div>
+              <div class="gate-meter" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <dl class="summary-list">
+                <div>
+                  <dt>分类</dt>
+                  <dd id="gate-category">-</dd>
+                </div>
+                <div>
+                  <dt>处理策略</dt>
+                  <dd id="gate-action">等待输入</dd>
+                </div>
+                <div>
+                  <dt>原因</dt>
+                  <dd id="gate-reason">系统会先拦截承重、儿童、医疗、食品接触、电气、交通安全件和危险用途。</dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+
+          <section class="surface clarification-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Clarification</p>
+                <h3>关键参数</h3>
+              </div>
+              <span class="small-tag" id="question-count">0/3</span>
+            </div>
+            <form id="clarification-form" class="question-grid"></form>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="tab-ticket">
+          <div class="content-grid two-column">
+            <section class="surface">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Spec</p>
+                  <h3>现实规格书</h3>
+                </div>
+                <span class="small-tag" id="realization-mode">未决策</span>
+              </div>
+              <div class="spec-sheet" id="spec-sheet"></div>
+            </section>
+
+            <section class="surface">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Decision</p>
+                  <h3>买 / 造 / 混合</h3>
+                </div>
+                <span class="small-tag" id="decision-badge">等待评估</span>
+              </div>
+              <div class="decision-map" id="decision-map"></div>
+            </section>
+          </div>
+
+          <section class="surface">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">BOM</p>
+                <h3>物料清单</h3>
+              </div>
+              <span class="small-tag">每项必须知道买还是造</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>物料</th>
+                    <th>类型</th>
+                    <th>数量</th>
+                    <th>规格</th>
+                    <th>可信度</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody id="bom-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="tab-quote">
+          <section class="surface">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Quote</p>
+                <h3>现实化方案</h3>
+              </div>
+              <span class="small-tag">最低可信到手成本</span>
+            </div>
+            <div class="quote-grid" id="quote-grid"></div>
+          </section>
+
+          <div class="content-grid two-column">
+            <section class="surface">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Trust</p>
+                  <h3>供应商可信度</h3>
+                </div>
+              </div>
+              <div class="vendor-list" id="vendor-list"></div>
+            </section>
+
+            <section class="surface">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Cost</p>
+                  <h3>成本公式</h3>
+                </div>
+              </div>
+              <ul class="cost-list" id="cost-list"></ul>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-fulfillment">
+          <div class="content-grid fulfillment-grid">
+            <section class="surface">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Order State</p>
+                  <h3>状态机</h3>
+                </div>
+                <button class="secondary-button compact" id="advance-status">
+                  <i data-lucide="arrow-right"></i>
+                  <span>推进</span>
+                </button>
+              </div>
+              <div class="timeline" id="status-timeline"></div>
+            </section>
+
+            <section class="surface">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">QC</p>
+                  <h3>质检记录</h3>
+                </div>
+                <button class="secondary-button compact" id="mark-qc">
+                  <i data-lucide="check"></i>
+                  <span>记录通过</span>
+                </button>
+              </div>
+              <div class="qc-list" id="qc-list"></div>
+            </section>
+          </div>
+
+          <section class="surface">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Package</p>
+                <h3>交付包</h3>
+              </div>
+              <span class="small-tag">主体件 + 配件包 + 安装卡 + 售后入口</span>
+            </div>
+            <div class="package-grid" id="package-grid"></div>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="tab-learning">
+          <div class="content-grid two-column">
+            <section class="surface">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Feedback</p>
+                  <h3>用户反馈</h3>
+                </div>
+                <button class="secondary-button compact" id="save-feedback">
+                  <i data-lucide="save"></i>
+                  <span>保存</span>
+                </button>
+              </div>
+              <div class="feedback-form">
+                <label>
+                  结果
+                  <select id="feedback-result">
+                    <option>稳定可用</option>
+                    <option>尺寸不合适</option>
+                    <option>缺件</option>
+                    <option>外观不满意</option>
+                    <option>需要重做</option>
+                  </select>
+                </label>
+                <label>
+                  备注
+                  <textarea id="feedback-note" rows="5" placeholder="例如：25mm 桌板夹持稳定，绕线槽可以再深一点。"></textarea>
+                </label>
+              </div>
+            </section>
+
+            <section class="surface">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Experience Base</p>
+                  <h3>现实经验库</h3>
+                </div>
+              </div>
+              <div class="learning-list" id="learning-list"></div>
+            </section>
+          </div>
+
+          <section class="surface">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Ticket JSON</p>
+                <h3>当前订单对象</h3>
+              </div>
+            </div>
+            <pre class="json-view" id="json-view"></pre>
+          </section>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
