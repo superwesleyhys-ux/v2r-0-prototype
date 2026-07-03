@@ -175,6 +175,11 @@ const defaultState = () => ({
 });
 
 let state = loadState();
+let apiHealth = {
+  checked: false,
+  connected: false,
+  modelConfigured: false,
+};
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -184,6 +189,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindEvents();
   hydrateInputs();
   render();
+  checkApiHealth();
   if (window.lucide) window.lucide.createIcons();
 });
 
@@ -249,6 +255,14 @@ async function requestAiDraft() {
   setAiStatus("AI 正在结构化 Reality Ticket 草案...", "loading");
 
   try {
+    if (apiHealth.checked && !apiHealth.connected) {
+      throw new Error("API 后端未部署或无法访问。请先部署 Vercel API，或设置 localStorage v2r_api_base。");
+    }
+
+    if (apiHealth.checked && apiHealth.connected && !apiHealth.modelConfigured) {
+      throw new Error("API 后端已连接，但 OPENAI_API_KEY 未配置。");
+    }
+
     const response = await fetch(`${apiBase()}/api/structure-ticket`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -264,10 +278,45 @@ async function requestAiDraft() {
     setTab("ticket");
     setAiStatus("AI 结构化完成，Ticket 已更新。", "ok");
   } catch (error) {
-    const message = error.message === "Failed to fetch" ? "未检测到本地 API 代理，请通过后端服务打开页面。" : error.message;
-    setAiStatus(message.includes("OPENAI_API_KEY") || message.includes("OPENAI_MODEL") ? "服务端还没有配置 OPENAI_API_KEY 或 OPENAI_MODEL。" : message, "error");
+    setAiStatus(describeApiError(error), "error");
   } finally {
     button.disabled = false;
+  }
+}
+
+async function checkApiHealth() {
+  setAiStatus("AI API 代理：检测中", "loading");
+
+  try {
+    const response = await fetch(`${apiBase()}/api/health`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    const data = await parseJsonResponse(response);
+
+    if (!response.ok || data.ok !== true) {
+      throw new Error(data.error || `API health failed: ${response.status}`);
+    }
+
+    apiHealth = {
+      checked: true,
+      connected: true,
+      modelConfigured: Boolean(data.modelConfigured),
+    };
+
+    if (apiHealth.modelConfigured) {
+      setAiStatus("AI API 代理：已连接", "ok");
+    } else {
+      setAiStatus("AI API 代理：后端已连接，OPENAI_API_KEY 未配置", "warning");
+    }
+  } catch {
+    apiHealth = {
+      checked: true,
+      connected: false,
+      modelConfigured: false,
+    };
+    setAiStatus("AI API 代理：未连接，当前为本地规则模式", "warning");
   }
 }
 
@@ -282,9 +331,30 @@ async function parseJsonResponse(response) {
     return JSON.parse(text);
   } catch {
     return {
-      error: response.ok ? "API 返回内容不是 JSON。" : "API 代理未启用或返回了非 JSON 响应。",
+      error: response.ok ? "API 返回内容不是 JSON。" : "API 代理未启用或返回了非 JSON 响应，可能命中了 GitHub Pages 静态 404。",
+      raw_text: text.slice(0, 160),
     };
   }
+}
+
+function describeApiError(error) {
+  const message = error.message || "";
+  if (message === "Failed to fetch") {
+    return "AI 结构化失败：API 后端未部署、CORS 被拒绝或网络不可达。请检查 /api/health 和 v2r_api_base。";
+  }
+  if (message.includes("OPENAI_API_KEY")) {
+    return "AI 结构化失败：后端未配置 OPENAI_API_KEY。";
+  }
+  if (message.includes("OPENAI_MODEL")) {
+    return "AI 结构化失败：后端 OPENAI_MODEL 配置异常。";
+  }
+  if (message.includes("non-JSON") || message.includes("不是 JSON") || message.includes("静态 404")) {
+    return "AI 结构化失败：API 返回非 JSON，可能请求到了 GitHub Pages 静态页而不是 Vercel 后端。";
+  }
+  if (message.includes("SCHEMA_VALIDATION_FAILED") || message.includes("schema")) {
+    return "AI 结构化失败：后端返回的 Ticket JSON 未通过 Schema 校验。";
+  }
+  return `AI 结构化失败：${message}`;
 }
 
 function setAiStatus(message, tone = "neutral") {

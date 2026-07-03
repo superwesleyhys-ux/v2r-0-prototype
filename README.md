@@ -32,11 +32,11 @@ Open `index.html` directly in a browser, or publish the repository through GitHu
 
 Real API keys must stay on the server. This repo does not store a real key in front-end code, GitHub Pages, README, or committed files.
 
-For local API-backed testing:
+For local API-backed testing with the Node static server:
 
 1. Copy `.env.example` to `.env.local`.
 2. Put the real key in `OPENAI_API_KEY` inside `.env.local`.
-3. Keep `OPENAI_MODEL=gpt-5.4-mini` or replace it with another available Responses API model.
+3. Keep `OPENAI_MODEL=gpt-4.1-mini` or replace it with another available Responses API model.
 4. Keep `OPENAI_BASE_URL=https://api.openai.com/v1` unless you deploy behind your own compatible API gateway.
 5. Run `node server.mjs`.
 6. Open `http://localhost:8766/`.
@@ -55,7 +55,21 @@ Reload the page after setting it.
 
 ## Deployable API
 
-The deployable endpoint is:
+The deployable endpoints are:
+
+```text
+GET /api/health
+```
+
+Returns:
+
+```json
+{
+  "ok": true,
+  "service": "v2r-api",
+  "modelConfigured": true
+}
+```
 
 ```text
 POST /api/structure-ticket
@@ -82,7 +96,36 @@ Response body is a strict V2R Ticket patch with:
 - `bom`
 - `quotes_allowed`
 
-`api/structure-ticket.js` is compatible with Vercel Functions. Local development uses the same core code through `server.mjs`.
+`api/structure-ticket.js` and `api/health.js` are compatible with Vercel Functions. Local development uses the same core code through `server.mjs`.
+
+## Vercel Deployment
+
+GitHub Pages can only run the static front end. The real AI proxy must be deployed to Vercel or another serverless/backend host.
+
+Local Vercel flow:
+
+```bash
+npm install
+npm run dev
+npm test
+```
+
+Vercel environment variables:
+
+```text
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+V2R_ALLOWED_ORIGINS=https://superwesleyhys-ux.github.io,http://localhost:8766,http://127.0.0.1:8766
+```
+
+After deploying the API, keep the GitHub Pages front end and point it at the Vercel backend:
+
+```js
+localStorage.setItem("v2r_api_base", "https://your-v2r-api.vercel.app");
+```
+
+Then reload the page. The health check should change the status to `AI API 代理：已连接`.
 
 ## v2r-0.2 Foundation
 
@@ -92,6 +135,15 @@ Response body is a strict V2R Ticket patch with:
 - Added front-end `applyAiPatch()` so the AI response updates Reality Gate, clarification questions, spec, BOM, and quote state.
 - Added `UNSUPPORTED` for high-value or regulated procurement such as vehicle purchases.
 - Added runnable v2r-0.2 tests with `npm test`.
+
+## v2r-0.3 Real Backend
+
+- Added `openai` SDK and `zod`.
+- Added `/api/health` for frontend connection detection.
+- Upgraded the V2R Ticket schema to Zod runtime validation plus Structured Outputs JSON Schema.
+- Enforced that non-A tickets cannot allow quotes.
+- Enforced that `D` and `UNSUPPORTED` tickets cannot generate BOM or automatic procurement.
+- Improved frontend API failure messages for missing backend, missing key, CORS/network failure, non-JSON responses, and schema failures.
 
 ## Demo Flow
 

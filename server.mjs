@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, extname, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { healthPayload } from "./api/health.js";
 import { structureTicket } from "./api/structureTicketCore.js";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,11 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/structure-ticket" || url.pathname === "/api/structure-intent") {
       await handleStructureTicket(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/health") {
+      handleHealth(request, response);
       return;
     }
 
@@ -104,6 +110,20 @@ async function serveStaticFile(url, response, headOnly) {
   }
 
   createReadStream(filePath).pipe(response);
+}
+
+function handleHealth(request, response) {
+  if (request.method === "OPTIONS") {
+    sendJson(response, 204, {});
+    return;
+  }
+
+  if (request.method !== "GET") {
+    sendJson(response, 405, { error: "Method not allowed" });
+    return;
+  }
+
+  sendJson(response, 200, healthPayload(process.env));
 }
 
 async function handleStructureTicket(request, response) {

@@ -1,9 +1,8 @@
 import { structureTicket } from "./structureTicketCore.js";
-
-const allowedOrigins = new Set(["http://localhost:8766", "http://127.0.0.1:8766", "https://superwesleyhys-ux.github.io"]);
+import { parseBody, setCors } from "./http.js";
 
 export default async function handler(req, res) {
-  setCors(req, res);
+  setCors(req, res, process.env);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -14,24 +13,10 @@ export default async function handler(req, res) {
   }
 
   const body = typeof req.body === "string" ? parseBody(req.body) : req.body || {};
+  if (body === null) {
+    return res.status(400).json({ error: "Invalid JSON request body", code: "INVALID_JSON" });
+  }
+
   const result = await structureTicket({ userIntent: body.userIntent, env: process.env, fetchImpl: fetch });
   return res.status(result.status).json(result.body);
-}
-
-function setCors(req, res) {
-  const origin = req.headers.origin;
-  if (allowedOrigins.has(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
-
-function parseBody(rawBody) {
-  try {
-    return JSON.parse(rawBody || "{}");
-  } catch {
-    return {};
-  }
 }

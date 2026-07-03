@@ -106,7 +106,7 @@ function buildBom(objectType, mode) {
       bom("主体支架", "print", 1, "PETG/PLA，颜色按用户指定", "draft"),
       bom("夹持结构", "print", 1, "按桌板厚度参数生成", "draft"),
       bom("防滑橡胶垫", "buy", 2, "20 x 30mm，可替代规格", "needs_quote"),
-      bom("M4 螺丝", "stock", 1, "M4 x 35mm", "candidate"),
+      bom("M4 螺丝", "inventory", 1, "M4 x 35mm", "candidate"),
     ];
   }
 

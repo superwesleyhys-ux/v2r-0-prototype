@@ -8,6 +8,15 @@ For v2r-0.2 API checks, run:
 npm test
 ```
 
+For v2r-0.3 backend checks:
+
+```bash
+curl -i http://localhost:8766/api/health
+curl -i -X POST http://localhost:8766/api/structure-ticket \
+  -H "Content-Type: application/json" \
+  -d '{"userIntent":"买个劳斯莱斯"}'
+```
+
 ## A-Class: Low Risk
 
 ### 1. Desk-Edge Headset Hook
@@ -185,3 +194,5 @@ Expected:
 - `QC_PENDING -> PACKING` should be blocked until every QC item is checked.
 - The front-end AI button should call `/api/structure-ticket`, not `api.openai.com` directly.
 - The OpenAI key should only be read from server-side environment variables.
+- `/api/health` should return JSON, never HTML.
+- AI output that fails the Zod schema should return `502` with `SCHEMA_VALIDATION_FAILED`.
