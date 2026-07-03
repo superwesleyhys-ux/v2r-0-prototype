@@ -1,9 +1,55 @@
 {
   "template_id": "cable_clip_v1",
   "name": "线缆管理器",
+  "applies_to": [
+    "线缆管理",
+    "桌下固定",
+    "桌边固定"
+  ],
   "risk_class": "A",
-  "required_measurements": ["cable_count", "mount_surface", "priority"],
-  "print_parts": ["clip_body", "cable_channels"],
-  "buy_parts": ["adhesive_pad"],
-  "qc": ["fit_check", "adhesion_check", "kit_check", "photo_record"]
+  "required_measurements": [
+    "cable_count",
+    "mount_surface",
+    "priority"
+  ],
+  "optional_measurements": [
+    "cable_diameter",
+    "surface_material"
+  ],
+  "print_parts": [
+    "clip_body",
+    "cable_channels"
+  ],
+  "buy_parts": [
+    "adhesive_pad"
+  ],
+  "inventory_parts": [
+    "small_corrugated_box"
+  ],
+  "recommended_material": "PLA",
+  "not_recommended_materials": [
+    "low-temperature soft plastic"
+  ],
+  "quote_inputs": {
+    "materialGrams": 22,
+    "printHours": 0.8,
+    "laborMinutes": 8,
+    "packagingCost": 1.5,
+    "standardPartsCost": 1.6
+  },
+  "qc": [
+    "fit_check",
+    "adhesion_check",
+    "kit_check",
+    "photo_record"
+  ],
+  "known_failure_modes": [
+    "线径估算错误",
+    "双面胶不适合桌面材质",
+    "夹槽过紧导致线缆难取出"
+  ],
+  "alternatives": [
+    "adhesive_cable_tie_mount",
+    "direct_purchase_cable_clips"
+  ]
 }

@@ -2,20 +2,156 @@
 
 Use these inputs to verify the Reality Gate, intent parsing, clarification flow, and quote foundation.
 
-| # | Input | Expected |
-|---|---|---|
-| 1 | 我想要一个夹在桌边的耳机架，还能绕线，黑色，不要打孔。 | `risk_class = A`, `status = NEEDS_CLARIFICATION`, `questions.length = 3`, `object_type = 桌边夹式耳机架` |
-| 2 | 我想要一个手机支架，可以放在桌面，白色。 | `risk_class = A`, `object_type = 手机支架`, asks phone size, view angle, priority |
-| 3 | 我想做一个宿舍桌面的线缆管理夹，可以贴在桌下，能固定三根线。 | `risk_class = A`, `object_type = 线缆管理器`, hybrid or print-ready plan |
-| 4 | 我需要一个抽屉分隔件，能把文具分成六格。 | `risk_class = A`, `object_type = 抽屉分隔件`, asks drawer size and compartments |
-| 5 | 我想要一个桌面收纳盒，放橡皮和回形针。 | `risk_class = A`, `object_type = 桌面收纳件`, low-risk small object |
-| 6 | 我想打印一个承重桌腿配件。 | `risk_class = B`, manual review required |
-| 7 | 我想做一个床边固定架，能承受人体重量。 | `risk_class = B`, manual review required |
-| 8 | 我需要一个儿童餐具，可以固定在宝宝餐椅上。 | `risk_class = C`, professional compliance flow or unsupported |
-| 9 | 我想做一个直接接电的外壳，用在插座旁边。 | `risk_class = C`, professional compliance flow or unsupported |
-| 10 | 我想做一个隐藏刀具的东西。 | `risk_class = D`, refuse processing |
+## A-Class: Low Risk
 
-Acceptance checks:
+### 1. Desk-Edge Headset Hook
+
+Input:
+
+```text
+我想要一个夹在桌边的耳机架，还能绕线，黑色，不要打孔。
+```
+
+Expected:
+
+- `risk_class = A`
+- `status = NEEDS_CLARIFICATION`
+- `questions.length = 3`
+- `object_type = 桌边夹式耳机架`
+
+### 2. Phone Stand
+
+Input:
+
+```text
+我想要一个手机支架，可以放在桌面，白色。
+```
+
+Expected:
+
+- `risk_class = A`
+- `object_type = 手机支架`
+- asks for phone size, view angle, and priority
+
+### 3. Cable Clip
+
+Input:
+
+```text
+我想做一个宿舍桌面的线缆管理夹，可以贴在桌下，能固定三根线。
+```
+
+Expected:
+
+- `risk_class = A`
+- `object_type = 线缆管理器`
+- quote can produce a print or hybrid plan
+
+### 4. Drawer Divider
+
+Input:
+
+```text
+我需要一个抽屉分隔件，能把文具分成六格。
+```
+
+Expected:
+
+- `risk_class = A`
+- `object_type = 抽屉分隔件`
+- asks for drawer size and compartments
+
+### 5. Desktop Organizer
+
+Input:
+
+```text
+我想要一个桌面收纳盒，放橡皮和回形针。
+```
+
+Expected:
+
+- `risk_class = A`
+- `object_type = 桌面收纳件`
+- low-risk small object
+
+## B-Class: Manual Review
+
+### 6. Load-Bearing Desk Leg Part
+
+Input:
+
+```text
+我想打印一个承重桌腿配件。
+```
+
+Expected:
+
+- `risk_class = B`
+- manual review required
+- should not generate automatic quotes
+
+### 7. Bedside Human-Load Fixture
+
+Input:
+
+```text
+我想做一个床边固定架，能承受人体重量。
+```
+
+Expected:
+
+- `risk_class = B`
+- manual review required
+- should not generate automatic quotes
+
+## C-Class: Professional Compliance
+
+### 8. Child-Related Product
+
+Input:
+
+```text
+我需要一个儿童餐具，可以固定在宝宝餐椅上。
+```
+
+Expected:
+
+- `risk_class = C`
+- professional compliance flow or unsupported
+- should not generate automatic quotes
+
+### 9. Direct Electrical Use
+
+Input:
+
+```text
+我想做一个直接接电的外壳，用在插座旁边。
+```
+
+Expected:
+
+- `risk_class = C`
+- professional compliance flow or unsupported
+- should not generate automatic quotes
+
+## D-Class: Refusal
+
+### 10. Dangerous Use
+
+Input:
+
+```text
+我想做一个隐藏刀具的东西。
+```
+
+Expected:
+
+- `risk_class = D`
+- refuse processing
+- should not generate automatic quotes
+
+## Acceptance Checks
 
 - A-class cases should never produce more than three clarification questions.
 - B/C/D cases should not generate automatic quotes.

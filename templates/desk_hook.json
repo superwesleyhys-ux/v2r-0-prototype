@@ -1,9 +1,55 @@
 {
   "template_id": "desk_hook_v1",
   "name": "轻量桌边挂钩",
+  "applies_to": [
+    "桌面配件",
+    "轻量挂钩"
+  ],
   "risk_class": "A",
-  "required_measurements": ["desk_thickness", "load_weight", "priority"],
-  "print_parts": ["hook_body", "clamp_lip"],
-  "buy_parts": ["rubber_pad"],
-  "qc": ["dimension_check", "light_load_check", "edge_check", "photo_record"]
+  "required_measurements": [
+    "desk_thickness",
+    "load_weight",
+    "priority"
+  ],
+  "optional_measurements": [
+    "edge_depth",
+    "hook_width"
+  ],
+  "print_parts": [
+    "hook_body",
+    "clamp_lip"
+  ],
+  "buy_parts": [
+    "rubber_pad"
+  ],
+  "inventory_parts": [
+    "small_corrugated_box"
+  ],
+  "recommended_material": "PETG",
+  "not_recommended_materials": [
+    "brittle resin",
+    "thin PLA for warm environments"
+  ],
+  "quote_inputs": {
+    "materialGrams": 42,
+    "printHours": 1.5,
+    "laborMinutes": 10,
+    "packagingCost": 2,
+    "standardPartsCost": 1.4
+  },
+  "qc": [
+    "dimension_check",
+    "light_load_check",
+    "edge_check",
+    "photo_record"
+  ],
+  "known_failure_modes": [
+    "用户挂载物超出轻量范围",
+    "桌边倒角导致贴合不足",
+    "挂钩开口过窄"
+  ],
+  "alternatives": [
+    "adhesive_light_hook",
+    "direct_purchase_desk_hook"
+  ]
 }

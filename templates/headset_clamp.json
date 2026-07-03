@@ -1,9 +1,62 @@
 {
   "template_id": "headset_clamp_v1",
   "name": "桌边夹式耳机架",
+  "applies_to": [
+    "桌面配件",
+    "耳机架",
+    "线缆管理"
+  ],
   "risk_class": "A",
-  "required_measurements": ["desk_thickness", "load_weight", "priority"],
-  "print_parts": ["main_hook", "clamp_body", "cable_slot"],
-  "buy_parts": ["rubber_pad", "m4_screw", "m4_nut"],
-  "qc": ["dimension_check", "stability_check", "kit_check", "photo_record"]
+  "required_measurements": [
+    "desk_thickness",
+    "load_weight",
+    "priority"
+  ],
+  "optional_measurements": [
+    "desk_edge_depth",
+    "available_width",
+    "cable_diameter"
+  ],
+  "print_parts": [
+    "main_hook",
+    "clamp_body",
+    "cable_slot"
+  ],
+  "buy_parts": [
+    "rubber_pad",
+    "m4_screw",
+    "m4_nut"
+  ],
+  "inventory_parts": [
+    "small_corrugated_box"
+  ],
+  "recommended_material": "PETG",
+  "not_recommended_materials": [
+    "brittle resin",
+    "unknown recycled filament"
+  ],
+  "quote_inputs": {
+    "materialGrams": 65,
+    "printHours": 2.4,
+    "laborMinutes": 12,
+    "packagingCost": 2.1,
+    "standardPartsCost": 4.8
+  },
+  "qc": [
+    "appearance_check",
+    "dimension_check",
+    "stability_check",
+    "kit_check",
+    "photo_record"
+  ],
+  "known_failure_modes": [
+    "桌板厚度输入错误",
+    "夹持力不足",
+    "防滑垫脱落",
+    "打印方向导致强度不足"
+  ],
+  "alternatives": [
+    "direct_purchase_headset_hook",
+    "adhesive_cable_hook"
+  ]
 }

@@ -653,6 +653,13 @@ td {
   gap: 8px;
 }
 
+.quote-explainer {
+  margin: 0 0 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
 .timeline {
   display: grid;
   gap: 8px;

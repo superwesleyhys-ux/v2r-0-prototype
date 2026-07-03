@@ -1,9 +1,54 @@
 {
   "template_id": "phone_stand_v1",
   "name": "手机支架",
+  "applies_to": [
+    "桌面配件",
+    "手机支架"
+  ],
   "risk_class": "A",
-  "required_measurements": ["phone_size", "view_angle", "priority"],
-  "print_parts": ["stand_body", "back_support", "cable_notch"],
-  "buy_parts": ["rubber_pad"],
-  "qc": ["angle_check", "stability_check", "edge_check", "photo_record"]
+  "required_measurements": [
+    "phone_size",
+    "view_angle",
+    "priority"
+  ],
+  "optional_measurements": [
+    "case_thickness",
+    "charging_cable_position"
+  ],
+  "print_parts": [
+    "stand_body",
+    "back_support",
+    "cable_notch"
+  ],
+  "buy_parts": [
+    "rubber_pad"
+  ],
+  "inventory_parts": [
+    "small_corrugated_box"
+  ],
+  "recommended_material": "PLA",
+  "not_recommended_materials": [
+    "flexible TPU for main body"
+  ],
+  "quote_inputs": {
+    "materialGrams": 48,
+    "printHours": 1.8,
+    "laborMinutes": 10,
+    "packagingCost": 2,
+    "standardPartsCost": 1.2
+  },
+  "qc": [
+    "angle_check",
+    "stability_check",
+    "edge_check",
+    "photo_record"
+  ],
+  "known_failure_modes": [
+    "手机壳厚度未计入",
+    "角度过陡导致滑落",
+    "底部防滑不足"
+  ],
+  "alternatives": [
+    "direct_purchase_phone_stand"
+  ]
 }

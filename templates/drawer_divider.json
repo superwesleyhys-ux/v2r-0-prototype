@@ -1,9 +1,52 @@
 {
   "template_id": "drawer_divider_v1",
   "name": "抽屉分隔件",
+  "applies_to": [
+    "桌面收纳",
+    "抽屉分隔"
+  ],
   "risk_class": "A",
-  "required_measurements": ["drawer_size", "compartments", "priority"],
-  "print_parts": ["divider_walls", "connector_tabs"],
+  "required_measurements": [
+    "drawer_size",
+    "compartments",
+    "priority"
+  ],
+  "optional_measurements": [
+    "drawer_corner_radius",
+    "target_item_sizes"
+  ],
+  "print_parts": [
+    "divider_walls",
+    "connector_tabs"
+  ],
   "buy_parts": [],
-  "qc": ["dimension_check", "fit_check", "edge_check", "photo_record"]
+  "inventory_parts": [
+    "small_corrugated_box"
+  ],
+  "recommended_material": "PLA",
+  "not_recommended_materials": [
+    "brittle resin"
+  ],
+  "quote_inputs": {
+    "materialGrams": 95,
+    "printHours": 3.1,
+    "laborMinutes": 14,
+    "packagingCost": 2.4,
+    "standardPartsCost": 0
+  },
+  "qc": [
+    "dimension_check",
+    "fit_check",
+    "edge_check",
+    "photo_record"
+  ],
+  "known_failure_modes": [
+    "用户量错抽屉内径",
+    "抽屉圆角未计入",
+    "打印件翘边导致装配不平"
+  ],
+  "alternatives": [
+    "adjustable_purchase_divider",
+    "foam_board_manual_divider"
+  ]
 }
