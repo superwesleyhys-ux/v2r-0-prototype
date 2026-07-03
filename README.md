@@ -24,7 +24,7 @@ See `NORTH_STAR.md` for the final product goal and safety boundary.
 - Order state machine
 - QC checklist
 - Delivery package and feedback learning
-- Optional OpenAI API proxy for AI-structured Ticket drafts
+- OpenAI API proxy for AI-structured Ticket drafts
 
 Open `index.html` directly in a browser, or publish the repository through GitHub Pages. The demo stores state in `localStorage`, and the JSON export button downloads the current Ticket object.
 
@@ -41,9 +41,57 @@ For local API-backed testing:
 5. Run `node server.mjs`.
 6. Open `http://localhost:8766/`.
 
-The front end calls `/api/structure-intent`. `server.mjs` forwards that request to the OpenAI Responses API with `Authorization: Bearer $OPENAI_API_KEY`, then returns only the structured draft to the browser.
+The front end calls `/api/structure-ticket`. `server.mjs` forwards that request to the OpenAI Responses API with `Authorization: Bearer $OPENAI_API_KEY`, asks for Structured Outputs using the V2R Ticket JSON Schema, then returns only the structured Ticket patch to the browser.
 
-GitHub Pages remains a static public demo. The API-backed button only works when this project is served by `server.mjs` or a deployed backend with `OPENAI_API_KEY` configured.
+GitHub Pages remains a static public demo. The API-backed button only works when this project is served by `server.mjs` or a deployed backend with `OPENAI_API_KEY` and `OPENAI_MODEL` configured.
+
+If the front end is on GitHub Pages and the API is deployed elsewhere, set the API base URL at runtime:
+
+```js
+localStorage.setItem("v2r_api_base", "https://your-v2r-api.vercel.app");
+```
+
+Reload the page after setting it.
+
+## Deployable API
+
+The deployable endpoint is:
+
+```text
+POST /api/structure-ticket
+```
+
+Request body:
+
+```json
+{
+  "userIntent": "我想要一个夹在桌边的耳机架，还能绕数据线，黑色，不要打孔"
+}
+```
+
+Response body is a strict V2R Ticket patch with:
+
+- `risk_class`
+- `category`
+- `handling_strategy`
+- `reason`
+- `object_type`
+- `questions`
+- `spec`
+- `realization_mode`
+- `bom`
+- `quotes_allowed`
+
+`api/structure-ticket.js` is compatible with Vercel Functions. Local development uses the same core code through `server.mjs`.
+
+## v2r-0.2 Foundation
+
+- Added `/api/structure-ticket` as the real AI structuring proxy.
+- Added `api/schema/v2rTicketSchema.js` for strict Structured Outputs.
+- Added `api/policy/realityGate.js` to block/refuse/redirect unsupported or high-risk requests before calling OpenAI.
+- Added front-end `applyAiPatch()` so the AI response updates Reality Gate, clarification questions, spec, BOM, and quote state.
+- Added `UNSUPPORTED` for high-value or regulated procurement such as vehicle purchases.
+- Added runnable v2r-0.2 tests with `npm test`.
 
 ## Demo Flow
 

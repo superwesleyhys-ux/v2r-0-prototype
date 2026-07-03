@@ -1,0 +1,10 @@
+{
+  "name": "v2r-0-prototype",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node tests/structure-ticket.test.mjs"
+  }
+}

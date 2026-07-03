@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, extname, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { structureTicket } from "./api/structureTicketCore.js";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 const inheritedEnv = new Set(Object.keys(process.env));
@@ -28,8 +29,8 @@ const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 
-    if (url.pathname === "/api/structure-intent") {
-      await handleStructureIntent(request, response);
+    if (url.pathname === "/api/structure-ticket" || url.pathname === "/api/structure-intent") {
+      await handleStructureTicket(request, response);
       return;
     }
 
@@ -105,15 +106,14 @@ async function serveStaticFile(url, response, headOnly) {
   createReadStream(filePath).pipe(response);
 }
 
-async function handleStructureIntent(request, response) {
-  if (request.method !== "POST") {
-    sendJson(response, 405, { error: "Method not allowed." });
+async function handleStructureTicket(request, response) {
+  if (request.method === "OPTIONS") {
+    sendJson(response, 204, {});
     return;
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    sendJson(response, 500, { error: "OPENAI_API_KEY is not configured on the server." });
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Method not allowed." });
     return;
   }
 
@@ -125,83 +125,12 @@ async function handleStructureIntent(request, response) {
     return;
   }
 
-  const intent = String(body.intent || "").trim();
-  if (!intent) {
-    sendJson(response, 400, { error: "Missing intent." });
-    return;
-  }
-
-  const model = process.env.OPENAI_MODEL || "gpt-5.4-mini";
-  const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
-  let upstream;
-  try {
-    upstream = await fetch(new URL("responses", `${baseUrl.replace(/\/$/, "")}/`), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_output_tokens: 900,
-        input: [
-          {
-            role: "system",
-            content: [
-              {
-                type: "input_text",
-                text:
-                  "You structure V2R user intents into safe reality-ops drafts. Return only compact JSON. Do not approve risky, illegal, medical, child-safety, food-contact, electrical, vehicle, or load-bearing items for automatic execution.",
-              },
-            ],
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "input_text",
-                text: buildStructurePrompt(intent),
-              },
-            ],
-          },
-        ],
-      }),
-    });
-  } catch (error) {
-    sendJson(response, 502, {
-      error: "Unable to reach the OpenAI API from this server.",
-      detail: error.message,
-    });
-    return;
-  }
-
-  const data = await upstream.json().catch(() => ({}));
-  if (!upstream.ok) {
-    sendJson(response, upstream.status, {
-      error: data.error?.message || "OpenAI request failed.",
-      type: data.error?.type || "openai_error",
-    });
-    return;
-  }
-
-  const outputText = extractOutputText(data);
-  sendJson(response, 200, {
-    model,
-    output_text: outputText,
-    draft: parseJsonDraft(outputText),
+  const result = await structureTicket({
+    userIntent: body.userIntent || body.intent,
+    env: process.env,
+    fetchImpl: fetch,
   });
-}
-
-function buildStructurePrompt(intent) {
-  return [
-    "User intent:",
-    intent,
-    "",
-    "Return JSON with these keys:",
-    "category, risk_class, object_type, functions, required_measurements, suggested_mode, safety_notes, missing_questions.",
-    "risk_class must be A, B, C, or D.",
-    "missing_questions must contain at most 3 concise questions.",
-  ].join("\n");
+  sendJson(response, result.status, result.body);
 }
 
 async function readJsonBody(request) {
@@ -219,34 +148,6 @@ async function readJsonBody(request) {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
     throw new Error("Invalid JSON request body.");
-  }
-}
-
-function extractOutputText(data) {
-  if (typeof data.output_text === "string") return data.output_text.trim();
-
-  return (data.output || [])
-    .flatMap((item) => item.content || [])
-    .map((content) => content.text || content.output_text || "")
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-}
-
-function parseJsonDraft(text) {
-  const trimmed = String(text || "").trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
-  if (!trimmed) return null;
-
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    const match = trimmed.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[0]);
-    } catch {
-      return null;
-    }
   }
 }
 

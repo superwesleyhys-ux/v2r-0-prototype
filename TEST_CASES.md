@@ -2,6 +2,12 @@
 
 Use these inputs to verify the Reality Gate, intent parsing, clarification flow, and quote foundation.
 
+For v2r-0.2 API checks, run:
+
+```bash
+npm test
+```
+
 ## A-Class: Low Risk
 
 ### 1. Desk-Edge Headset Hook
@@ -151,10 +157,31 @@ Expected:
 - refuse processing
 - should not generate automatic quotes
 
+## Unsupported Procurement
+
+### 11. High-Value Vehicle Purchase
+
+Input:
+
+```text
+买个劳斯莱斯
+```
+
+Expected:
+
+- `risk_class = UNSUPPORTED`
+- `category = 暂不支持的高价值车辆采购`
+- `quotes_allowed = false`
+- does not generate BOM
+- does not generate quotes
+- can be recorded as a future high-value procurement research case
+
 ## Acceptance Checks
 
 - A-class cases should never produce more than three clarification questions.
-- B/C/D cases should not generate automatic quotes.
+- B/C/D/UNSUPPORTED cases should not generate automatic quotes.
 - User-controlled text should render as text, not HTML.
 - Quote prices should come from `quote_inputs` and the quote engine, not fixed display-only values.
 - `QC_PENDING -> PACKING` should be blocked until every QC item is checked.
+- The front-end AI button should call `/api/structure-ticket`, not `api.openai.com` directly.
+- The OpenAI key should only be read from server-side environment variables.

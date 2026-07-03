@@ -380,6 +380,7 @@ select:focus {
 }
 
 .risk-pill.risk-medium,
+.risk-pill.risk-unsupported,
 .type-pill.buy {
   background: var(--amber-soft);
   color: var(--amber);

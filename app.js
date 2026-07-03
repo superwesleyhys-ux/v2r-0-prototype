@@ -2,6 +2,10 @@ const STORAGE_KEY = "v2r0-reality-ops-state";
 
 const statuses = [
   "DRAFT",
+  "UNSUPPORTED",
+  "REFUSED",
+  "MANUAL_REVIEW",
+  "PROFESSIONAL_REVIEW",
   "NEEDS_CLARIFICATION",
   "SAFE_APPROVED",
   "PLANNED",
@@ -81,6 +85,14 @@ const riskRules = [
     keywords: ["武器", "枪", "刀", "爆炸", "bomb", "weapon", "bypass", "规避", "违法"],
   },
   {
+    risk: "UNSUPPORTED",
+    level: "unsupported",
+    category: "暂不支持的高价值或受监管采购",
+    action: "不进入自动采购",
+    reason: "车辆、房产、飞机、游艇等高价值或受监管采购不属于 V2R-0 的低风险小物件范围。",
+    keywords: ["劳斯莱斯", "rolls royce", "rolls-royce", "买车", "汽车", "车辆采购", "房子", "飞机", "游艇"],
+  },
+  {
     risk: "C",
     level: "high",
     category: "高风险消费品",
@@ -156,6 +168,7 @@ const defaultState = () => ({
   delivery_method: "ship_to_home",
   learning: [],
   quote_inputs: null,
+  quotes_allowed: false,
   ai_draft: null,
   history: [],
   last_action_message: "等待用户输入。",
@@ -236,10 +249,10 @@ async function requestAiDraft() {
   setAiStatus("AI 正在结构化 Reality Ticket 草案...", "loading");
 
   try {
-    const response = await fetch("/api/structure-intent", {
+    const response = await fetch(`${apiBase()}/api/structure-ticket`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intent }),
+      body: JSON.stringify({ userIntent: intent }),
     });
     const data = await parseJsonResponse(response);
 
@@ -247,20 +260,20 @@ async function requestAiDraft() {
       throw new Error(data.error || `API 请求失败：${response.status}`);
     }
 
-    runPipeline();
-    state.ai_draft = data.draft || { output_text: data.output_text || "" };
-    state.last_action_message = "AI 结构化草案已保存；Reality Gate 仍由本地安全规则复核。";
-    addHistory("AI_DRAFT_CREATED", "openai_proxy", `模型 ${data.model || "unknown"} 返回结构化草案。`);
-    saveState();
-    render();
+    applyAiPatch(data, intent);
     setTab("ticket");
-    setAiStatus("AI 草案已写入 Ticket JSON，本地 Reality Gate 已复核。", "ok");
+    setAiStatus("AI 结构化完成，Ticket 已更新。", "ok");
   } catch (error) {
     const message = error.message === "Failed to fetch" ? "未检测到本地 API 代理，请通过后端服务打开页面。" : error.message;
-    setAiStatus(message.includes("OPENAI_API_KEY") ? "服务端还没有配置 OPENAI_API_KEY。" : message, "error");
+    setAiStatus(message.includes("OPENAI_API_KEY") || message.includes("OPENAI_MODEL") ? "服务端还没有配置 OPENAI_API_KEY 或 OPENAI_MODEL。" : message, "error");
   } finally {
     button.disabled = false;
   }
+}
+
+function apiBase() {
+  const configured = window.V2R_API_BASE || localStorage.getItem("v2r_api_base") || "";
+  return String(configured).replace(/\/$/, "");
 }
 
 async function parseJsonResponse(response) {
@@ -279,6 +292,131 @@ function setAiStatus(message, tone = "neutral") {
   if (!status) return;
   status.textContent = message;
   status.className = `ai-status ${safeClassToken(tone)}`.trim();
+}
+
+function applyAiPatch(patch, intent) {
+  const riskClass = patch.risk_class || "B";
+  const objectType = patch.object_type || patch.spec?.project_name || "待结构化小物件";
+  const quotesAllowed = Boolean(patch.quotes_allowed && riskClass === "A");
+  const normalizedSpec = normalizeAiSpec(patch.spec, objectType, intent);
+
+  state = {
+    ...defaultState(),
+    ticket_id: state.ticket_id || "V2R-0001",
+    user_intent: intent,
+    category: patch.category || "待人工归类",
+    risk_level: riskLevelForAiRisk(riskClass),
+    risk_class: riskClass,
+    status: statusForAiRisk(riskClass, patch.questions || []),
+    gate: {
+      level: gateLevelForAiRisk(riskClass),
+      action: patch.handling_strategy || "人工审核",
+      reason: patch.reason || "AI 返回结果缺少原因，需人工复核。",
+    },
+    spec: normalizedSpec,
+    questions: normalizeAiQuestions(patch.questions),
+    answers: {},
+    realization_mode: normalizeMode(patch.realization_mode),
+    bom: normalizeAiBom(patch.bom),
+    quotes_allowed: quotesAllowed,
+    quotes: quotesAllowed ? buildQuotes(normalizedSpec.object_type, buildQuoteInputs(normalizedSpec.object_type, {})) : [],
+    quote_inputs: quotesAllowed ? buildQuoteInputs(normalizedSpec.object_type, {}) : null,
+    vendors: quotesAllowed ? buildVendors() : [],
+    selected_quote_id: null,
+    qc_requirements: riskClass === "A" ? buildQc(normalizedSpec.object_type) : [],
+    package_items: riskClass === "A" ? buildPackageItems(normalizedSpec.object_type) : [],
+    delivery_method: "ship_to_home",
+    learning: buildLearningSeed(normalizedSpec.object_type),
+    ai_draft: patch,
+    last_action_message: messageForAiRisk(riskClass, quotesAllowed),
+  };
+
+  addHistory("AI_TICKET_STRUCTURED", "openai_proxy", `${riskClass} 类：${state.gate.action}`);
+  saveState();
+  render();
+}
+
+function normalizeAiSpec(spec = {}, objectType, intent) {
+  return {
+    project_name: spec.project_name || objectType,
+    object_type: objectType,
+    user_goal: spec.user_goal || intent,
+    functions: Array.isArray(spec.functions) ? spec.functions : [],
+    color: "未指定",
+    environment: spec.environment || "未指定",
+    required_measurements: [],
+    key_dimensions: [],
+    budget: null,
+    deadline: null,
+    manufacturing_constraints: Array.isArray(spec.constraints) ? spec.constraints : [],
+    acceptance: Array.isArray(spec.acceptance) ? spec.acceptance : [],
+  };
+}
+
+function normalizeAiQuestions(questions = []) {
+  return questions.slice(0, 3).map((question) => ({
+    id: question.id || "clarification",
+    label: question.label || "需要补充的信息",
+    placeholder: question.why_needed || "用于确认现实化参数",
+  }));
+}
+
+function normalizeAiBom(bom = []) {
+  return bom.map((item) => ({
+    name: item.name || "待确认物料",
+    type: item.type === "stock" ? "inventory" : item.type || "unknown",
+    quantity: item.quantity || 1,
+    spec: item.spec || "待确认",
+    required: true,
+    alternatives: [],
+    risk_level: "low",
+    trust_score: 80,
+    source_status: item.status || "needs_quote",
+  }));
+}
+
+function normalizeMode(mode) {
+  if (["buy", "print", "hybrid"].includes(mode)) return mode;
+  if (mode === "unsupported") return "unsupported";
+  if (mode === "refuse") return "refuse";
+  return "manual_review";
+}
+
+function statusForAiRisk(riskClass, questions) {
+  if (riskClass === "A") return questions.length ? "NEEDS_CLARIFICATION" : "QUOTED";
+  if (riskClass === "B") return "MANUAL_REVIEW";
+  if (riskClass === "C") return "PROFESSIONAL_REVIEW";
+  if (riskClass === "D") return "REFUSED";
+  return "UNSUPPORTED";
+}
+
+function gateLevelForAiRisk(riskClass) {
+  const levels = {
+    A: "low",
+    B: "review",
+    C: "high",
+    D: "blocked",
+    UNSUPPORTED: "unsupported",
+  };
+  return levels[riskClass] || "review";
+}
+
+function riskLevelForAiRisk(riskClass) {
+  const levels = {
+    A: "low",
+    B: "medium",
+    C: "high",
+    D: "prohibited",
+    UNSUPPORTED: "unsupported",
+  };
+  return levels[riskClass] || "medium";
+}
+
+function messageForAiRisk(riskClass, quotesAllowed) {
+  if (riskClass === "A" && quotesAllowed) return "AI 已生成结构化 Ticket 草案，可继续补充参数并复核报价。";
+  if (riskClass === "UNSUPPORTED") return "该请求暂不支持，不生成自动采购、报价或 BOM。";
+  if (riskClass === "D") return "该请求被拒绝，不生成自动采购、报价或 BOM。";
+  return "该请求需要人工或专业审核，不生成自动报价或履约任务。";
 }
 
 function setTab(name) {
@@ -312,7 +450,7 @@ function runPipeline(seedAnswers = {}) {
     category: parsed.category,
     risk_level: parsed.riskLevel,
     risk_class: parsed.riskClass,
-    status: parsed.riskClass === "A" ? "NEEDS_CLARIFICATION" : "DRAFT",
+    status: statusForAiRisk(parsed.riskClass, parsed.questions),
     gate: parsed.gate,
     spec: parsed.spec,
     questions: parsed.questions,
@@ -344,7 +482,7 @@ function parseIntent(rawIntent) {
   if (matchedRule) {
     return {
       category: matchedRule.category,
-      riskLevel: matchedRule.level === "blocked" ? "prohibited" : "high",
+      riskLevel: matchedRule.level === "blocked" ? "prohibited" : matchedRule.level === "unsupported" ? "unsupported" : "high",
       riskClass: matchedRule.risk,
       gate: {
         level: matchedRule.level,
@@ -398,6 +536,7 @@ function parseIntent(rawIntent) {
 }
 
 function inferObjectType(intent) {
+  if (matches(intent, ["劳斯莱斯", "rolls royce", "rolls-royce", "汽车", "买车"])) return "车辆采购请求";
   if (matches(intent, ["耳机", "headphone", "headset"])) return "桌边夹式耳机架";
   if (matches(intent, ["手机", "phone", "stand"])) return "手机支架";
   if (matches(intent, ["线缆", "数据线", "电线", "cable"])) return "线缆管理器";
@@ -526,6 +665,7 @@ function finishPlanning() {
   state.bom = buildBom(state.spec.object_type, state.realization_mode);
   state.quote_inputs = buildQuoteInputs(state.spec.object_type, state.answers);
   state.quotes = buildQuotes(state.spec.object_type, state.quote_inputs);
+  state.quotes_allowed = true;
   state.vendors = buildVendors();
   state.last_action_message = "报价已由本地 quote engine 计算，仍属于模拟履约。";
   addHistory("SPEC_GENERATED", "system", "规格书和 BOM 已生成。");
@@ -821,6 +961,7 @@ function renderGate() {
     review: "B 类审核",
     high: "C 类高风险",
     blocked: "D 类拒绝",
+    unsupported: "暂不支持",
   };
   pill.textContent = levelText[state.gate.level] || "未评估";
   pill.className = `risk-pill risk-${state.gate.level || "low"}`;
@@ -982,8 +1123,8 @@ function renderBom() {
 function renderQuotes() {
   const grid = $("#quote-grid");
   clearNode(grid);
-  if (["B", "C", "D"].includes(state.risk_class)) {
-    grid.append(textEl("div", "该请求未通过 A 类自动处理门槛，报价需转人工或拒绝。", "empty-state"));
+  if (["B", "C", "D", "UNSUPPORTED"].includes(state.risk_class)) {
+    grid.append(textEl("div", "该请求不进入自动报价、采购或履约。", "empty-state"));
     return;
   }
   if (!state.quotes.length) {
@@ -1324,6 +1465,9 @@ function modeLabel(mode) {
     buy: "直接购买",
     print: "3D 打印",
     hybrid: "混合方案",
+    manual_review: "人工审核",
+    unsupported: "暂不支持",
+    refuse: "拒绝处理",
     undecided: "未决策",
   };
   return labels[mode] || "人工审核";
