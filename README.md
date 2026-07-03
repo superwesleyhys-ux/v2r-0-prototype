@@ -6,6 +6,12 @@ The core product idea is simple:
 
 > A user writes what they want, and the system turns that intent into a Reality Ticket with safety gating, specification, BOM, quote, fulfillment state, QC, delivery, and feedback learning.
 
+Long-term direction:
+
+> Codex turns language into code. V2R turns language into reality.
+
+See `NORTH_STAR.md` for the final product goal and safety boundary.
+
 ## What It Includes
 
 - Natural language intake
